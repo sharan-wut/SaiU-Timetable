@@ -272,6 +272,16 @@ function initAutoRefresh() {
     setInterval(() => load({ background: true }), CONFIG.REFRESH_INTERVAL);
 }
 
+// True when the app is already running as an installed app (desktop or mobile),
+// in any display mode the platform may use.
+function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+        navigator.standalone === true;
+}
+
 function initPWA() {
     if ('serviceWorker' in navigator) {
         // Live Server / local dev: never use a service worker. A stale worker
@@ -287,10 +297,18 @@ function initPWA() {
             navigator.serviceWorker.register('./sw.js').catch(() => {});
         }
     }
+
+    // Inside the installed app the install button is meaningless — never show it.
+    if (isStandalone()) return;
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         window.deferredPrompt = e;
         $('#install-btn').classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+        window.deferredPrompt = null;
+        $('#install-btn').classList.add('hidden');
     });
 }
 
