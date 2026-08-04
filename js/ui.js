@@ -332,7 +332,7 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
                     </div>
                     <span class="status-badge ${badge.cls}">${badge.label}</span>
                 </div>
-                ${c.roomChanged ? `<span class="room-change-badge">${ICONS.alertTriangle}<span>Room changed</span></span>` : ''}
+                ${c.roomChanged ? `<span class="room-change-badge">${ICONS.alertTriangle}<span>${c.originalRoom ? `Room changed · ${escapeHtml(c.originalRoom)} → ${escapeHtml(c.room)}` : 'Room changed'}</span></span>` : ''}
                 ${live}
                 ${progress}
                 <div class="tl-time-row">

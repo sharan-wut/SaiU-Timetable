@@ -15,7 +15,7 @@ export const CONFIG = {
 
     // Cache keys (localStorage)
     CACHE_KEY: 'tt-timetable-cache-v1',
-    ROOMS_KEY: 'tt-room-map-v1',
+    ROOMS_KEY: 'tt-room-map-v3',
     SECTION_KEY: 'tt-section',
 
     // Any gap between classes >= this many minutes is shown as a break
