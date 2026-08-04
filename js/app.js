@@ -3,6 +3,7 @@ import { parseCSV } from './parser.js';
 import { getCachedTimetable, setCachedTimetable, updateRoomMap, getTheme, setTheme, getSection, setSection } from './storage.js';
 import * as ui from './ui.js';
 import { todayName, nowMinutes, nextSchoolDay, isSchoolDay } from './utils.js';
+import { init as initAnalytics, trackEvent } from './analytics.js';
 
 /**
  * App bootstrap, fetch, and interactivity.
@@ -47,8 +48,8 @@ function setThemeUI() {
     const eff = effectiveTheme(preference);
     document.documentElement.classList.remove('light-theme', 'dark-theme');
     document.documentElement.classList.add(eff + '-theme');
-    const meta = document.querySelector('#theme-color-meta');
-    if (meta) meta.content = eff === 'dark' ? '#0a0b0c' : '#ffffff';
+    const color = eff === 'dark' ? '#111111' : '#ffffff';
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = color; });
     ui.setThemeIcon(preference);
 }
 
@@ -113,6 +114,7 @@ async function load({ silent = false, background = false } = {}) {
         updateRoomMap(classes);
         syncSections();
         render();
+        trackEvent('timetable_refreshed', { source: background ? 'background' : silent ? 'manual' : 'initial' });
         if (!silent) ui.showToast('Timetable refreshed');
     } catch {
         if (!cached) ui.renderError();
@@ -199,6 +201,7 @@ function initPullToRefresh() {
 function initSearch() {
     const input = $('.search-input');
     const clear = $('.search-clear');
+    let searchTimer = null;
 
     // Only the timeline depends on the query, so a keystroke re-renders just
     // that instead of the whole app (day / section stay untouched).
@@ -213,6 +216,11 @@ function initSearch() {
     input.addEventListener('input', () => {
         clear.classList.toggle('hidden', !input.value);
         renderTimelineOnly();
+        clearTimeout(searchTimer);
+        const q = input.value.trim();
+        if (!q) return;
+        // Debounce so a burst of keystrokes records one search, not N.
+        searchTimer = setTimeout(() => trackEvent('search_used', { search_term: q }), 600);
     });
     clear.addEventListener('click', () => {
         input.value = '';
@@ -239,6 +247,7 @@ function initHeaderActions() {
         const next = { dark: 'light', light: 'system', system: 'dark' }[getTheme()] || 'light';
         setTheme(next);
         setThemeUI();
+        trackEvent('theme_changed', { theme: next });
     });
     $('#install-btn').addEventListener('click', () => {
         if (window.deferredPrompt) {
@@ -254,6 +263,7 @@ function initHeaderActions() {
 function initDayFilter() {
     window.addEventListener('daychange', (e) => {
         selectedDay = e.detail.day;
+        trackEvent('weekday_changed', { weekday: e.detail.day });
         render();
     });
 }
@@ -264,6 +274,7 @@ function initSectionSelector() {
         if (s === selectedSection) return;
         selectedSection = s;
         setSection(s);
+        trackEvent('section_changed', { section: s });
         render();
     });
 }
@@ -309,10 +320,12 @@ function initPWA() {
     window.addEventListener('appinstalled', () => {
         window.deferredPrompt = null;
         $('#install-btn').classList.add('hidden');
+        trackEvent('pwa_installed');
     });
 }
 
 function init() {
+    initAnalytics();
     initTheme();
     setThemeUI();
     initPWA();

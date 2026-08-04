@@ -7,6 +7,12 @@
 export const CONFIG = {
     SHEET_ID: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
     GID: '0',
+
+    // Google Analytics 4 Measurement ID. Configured once in index.html
+    // <head> (the analytics bootstrap); this reads it back so the value
+    // never needs to be duplicated here.
+    GA_ID: (window.__TT_GA && window.__TT_GA.id) || '',
+
     REFRESH_INTERVAL: 5 * 60 * 1000, // auto-refresh period (ms)
 
     // Active weekdays shown in the selector and used by navigation.

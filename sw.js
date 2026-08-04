@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timetable-v7';
+const CACHE_NAME = 'timetable-v9';
 const ASSETS = [
   'index.html',
   'style.css',
@@ -9,7 +9,12 @@ const ASSETS = [
   'js/storage.js',
   'js/ui.js',
   'js/app.js',
+  'icons/favicon-32.png',
   'icons/favicon.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/icon-maskable-192.png',
+  'icons/icon-maskable-512.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 ];
 
@@ -72,6 +77,12 @@ self.addEventListener('fetch', (event) => {
   if (isDevHost) return; // never intercept on dev hosts
 
   const url = event.request.url;
+
+  // Never intercept Google Analytics — always fetch fresh from the network
+  // so GA4 gets its latest gtag.js and page views are never served stale.
+  if (url.includes('googletagmanager.com')) {
+    return;
+  }
 
   if (url.includes('docs.google.com/spreadsheets') && url.includes('export')) {
     event.respondWith(
