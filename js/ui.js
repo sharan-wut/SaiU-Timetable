@@ -326,7 +326,7 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
                     <div>
                         <div class="tl-subject">${escapeHtml(c.subject)}</div>
                         <div class="tl-meta">
-                            ${c.faculty ? `<span>${escapeHtml(c.faculty)}</span>` : ''}
+                            ${c.faculty ? `<span class="tl-faculty">${escapeHtml(c.faculty)}</span>` : ''}
                             <span class="tl-room">${ICONS.mapPin}<span>${escapeHtml(c.room || 'Room TBA')}</span></span>
                         </div>
                     </div>

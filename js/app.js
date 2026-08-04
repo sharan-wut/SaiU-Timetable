@@ -48,7 +48,7 @@ function setThemeUI() {
     document.documentElement.classList.remove('light-theme', 'dark-theme');
     document.documentElement.classList.add(eff + '-theme');
     const meta = document.querySelector('#theme-color-meta');
-    if (meta) meta.content = eff === 'dark' ? '#0b0c0e' : '#fafbfc';
+    if (meta) meta.content = eff === 'dark' ? '#0a0b0c' : '#ffffff';
     ui.setThemeIcon(preference);
 }
 

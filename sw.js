@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timetable-v4';
+const CACHE_NAME = 'timetable-v5';
 const ASSETS = [
   'index.html',
   'style.css',
@@ -9,10 +9,8 @@ const ASSETS = [
   'js/storage.js',
   'js/ui.js',
   'js/app.js',
-  'icons/icon-192x192.png',
-  'icons/icon-512x512.png',
-  'icons/maskable-icon-512x512.png',
-  'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap'
+  'icons/favicon.png',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 ];
 
 const SHEET_CACHE = 'timetable-sheet-v1';
