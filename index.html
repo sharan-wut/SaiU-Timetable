@@ -5,19 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Timetable</title>
     <meta name="description" content="Real-time university timetable dashboard with live class tracking, countdowns and offline support.">
-    <meta name="theme-color" id="theme-color-meta" content="#0a0b0c">
+    <meta name="theme-color" id="theme-color-meta" content="#111111">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111111">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="icons/favicon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Timetable">
     <link rel="apple-touch-icon" href="icons/favicon.png">
-    <link rel="apple-touch-startup-image" href="icons/favicon.png">
     <script>
         // Apply the saved theme before first paint to avoid a flash.
         (function () {
@@ -29,7 +32,43 @@
                     t = 'dark';
                 }
                 document.documentElement.className = t + '-theme';
+                // Match the browser chrome to the app in both modes, pre-paint.
+                var c = t === 'dark' ? '#111111' : '#ffffff';
+                document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; });
             } catch (e) {}
+        })();
+    </script>
+    <script>
+        // Google Analytics 4 — asynchronous, single-load, DNT-aware.
+        //
+        // The Measurement ID is configured in ONE place: `id` below.
+        // Replace G-XXXXXXXXXX with your real GA4 Measurement ID.
+        // config.js reads it back via window.__TT_GA.id.
+        (function () {
+            var id = 'G-GYB0SEBGZM';
+            window.__TT_GA = { id: id };
+
+            // Never initialize twice (hot-reload / re-execution safety).
+            if (window.__TT_GA_READY) return;
+
+            // Respect "Do Not Track": no script, no dataLayer, no events.
+            var dnt = navigator.doNotTrack || window.doNotTrack;
+            if (dnt === '1' || dnt === 'yes') return;
+
+            window.__TT_GA_READY = true;
+
+            // Inject gtag.js asynchronously — never blocks first paint.
+            var s = document.createElement('script');
+            s.async = true;
+            s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+            document.head.appendChild(s);
+
+            // Official dataLayer bootstrap. `gtag('config', id)` fires the
+            // automatic page_view once on load.
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function () { window.dataLayer.push(arguments); };
+            gtag('js', new Date());
+            gtag('config', id);
         })();
     </script>
 </head>
