@@ -27,7 +27,7 @@
 
 html.dark-theme {
     color-scheme: dark;
-    --bg: #0a0b0c;
+    --bg: #111111;
     --surface: #121315;
     --surface-2: #17181a;
     --surface-3: #1d1f21;
@@ -45,7 +45,7 @@ html.dark-theme {
     --success-soft: rgba(90, 168, 111, 0.10);
     --warning: #d19a4f;
     --warning-soft: rgba(209, 154, 79, 0.10);
-    --header-bg: rgba(10, 11, 12, 0.82);
+    --header-bg: rgba(17, 17, 17, 0.82);
 }
 
 html.light-theme {
