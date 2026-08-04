@@ -1,12 +1,26 @@
 /* ============================================================
    Timetable — minimal, production design system
-   Neutral gray surfaces with a red accent (dark) / blue accent
-   (light). Linear/GitHub-style: flat cards, subtle borders,
-   1px lines, restrained motion. No purple anywhere.
+   MOBILE-FIRST. Neutral gray surfaces with a red accent (dark) /
+   blue accent (light). Linear/GitHub-style: flat cards, subtle
+   borders, 1px lines, restrained motion. Desktop is an
+   enhancement layered on top via min-width breakpoints.
    ============================================================ */
 
 /* ---------- Tokens ---------- */
 :root {
+    --container: 720px;
+
+    /* Spacing scale: 4 / 8 / 12 / 16 / 24 / 32 */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    /* Minimum comfortable touch target */
+    --touch: 44px;
+
     --radius-lg: 18px;
     --radius-md: 12px;
     --radius-sm: 8px;
@@ -63,7 +77,7 @@ html.light-theme {
     --primary-text: #1d4ed8;
     --success: #16a34a;
     --success-soft: rgba(22, 163, 74, 0.12);
-    --warning: #b45309;
+    --warning: #b40909;
     --warning-soft: rgba(180, 83, 9, 0.12);
     --glow: 0 0 0 3px rgba(37, 99, 235, 0.18);
     --header-bg: rgba(250, 251, 252, 0.85);
@@ -85,6 +99,9 @@ body {
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: contain;
+    /* Safety net: no horizontal page scroll, ever. clip() does not create a
+       scroll container, so sticky headers keep working. */
+    overflow-x: clip;
     transition: background-color var(--med) var(--ease);
 }
 
@@ -132,7 +149,10 @@ input { font-family: inherit; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ---------- Header ---------- */
+/* ============================================================
+   HEADER — compact, mobile-first
+   Title left, icons right, no wrapping.
+   ============================================================ */
 .app-header {
     position: sticky;
     top: 0;
@@ -141,40 +161,51 @@ input { font-family: inherit; }
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px calc(10px + env(safe-area-inset-top, 0px));
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 14px 10px;
 }
 
 .header-top {
-    max-width: 720px;
+    max-width: var(--container);
     margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
+.brand { min-width: 0; }
+
 .brand h1 {
-    font-size: 1.35rem;
+    font-size: clamp(1.8rem, 5vw, 2.4rem);
     font-weight: 650;
+    line-height: 1.12;
     letter-spacing: -0.02em;
     color: var(--text);
+    white-space: nowrap;
 }
 
 .date-line {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     margin-top: 2px;
     display: flex;
     align-items: center;
     gap: 6px;
+    white-space: nowrap;
 }
+.date-line strong { font-weight: 600; }
 .date-line .date-sep { color: var(--text-tertiary); }
 
-.header-actions { display: flex; gap: 8px; }
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+}
 
 .icon-btn {
-    width: 40px; height: 40px;
+    width: var(--touch);
+    height: var(--touch);
     border-radius: var(--radius-sm);
     display: grid;
     place-items: center;
@@ -191,17 +222,20 @@ input { font-family: inherit; }
 .icon-btn.spinning svg { animation: spin 0.7s linear infinite; }
 .icon-btn .lucide { display: block; }
 
-/* ---------- Search ---------- */
+/* ============================================================
+   SEARCH — full width, compact, no overlap
+   ============================================================ */
 .search-row {
-    max-width: 720px;
-    margin: 14px auto 0;
+    max-width: var(--container);
+    margin: var(--space-3) auto 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-1);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 9px 14px;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    min-height: 48px;
     transition: border-color var(--fast) var(--ease),
                 box-shadow var(--fast) var(--ease);
 }
@@ -213,18 +247,22 @@ input { font-family: inherit; }
 #search-input {
     flex: 1;
     min-width: 0;
+    height: var(--touch);
     background: none;
     border: none;
     outline: none;
     color: var(--text);
-    font-size: 0.95rem;
+    /* 16px minimum prevents iOS auto-zoom on focus */
+    font-size: 1rem;
 }
 #search-input::placeholder { color: var(--text-tertiary); opacity: 1; }
 #search-input::-webkit-search-cancel-button,
 #search-input::-webkit-search-decoration { -webkit-appearance: none; }
+
 .search-clear {
     color: var(--text-tertiary);
-    width: 26px; height: 26px;
+    width: var(--touch);
+    height: var(--touch);
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -233,6 +271,10 @@ input { font-family: inherit; }
                 color var(--fast) var(--ease);
 }
 .search-clear:hover { background: var(--surface-3); color: var(--text); }
+
+/* Ctrl+K badge: hidden on touch/small screens; the clear button and hint
+   are flex siblings with flex-shrink:0 and a min-width:0 input, so they can
+   never overlap — the input simply gives up space first. */
 .search-hint {
     display: none;
     align-items: center;
@@ -246,37 +288,52 @@ input { font-family: inherit; }
     border-radius: 6px;
     padding: 2px 7px;
     line-height: 1.4;
+    white-space: nowrap;
 }
 @media (hover: hover) and (min-width: 640px) {
     .search-hint { display: inline-flex; }
 }
 
-/* ---------- Section selector ---------- */
+/* ============================================================
+   CHIP ROWS (section + weekday) — scrollable on phones,
+   a single wrapping grid on tablets/desktops.
+   ============================================================ */
 .section-row {
-    max-width: 720px;
-    margin: 12px auto 0;
+    max-width: var(--container);
+    margin: var(--space-3) auto 0;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
 }
 .section-label {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.02em;
     color: var(--text-tertiary);
     flex-shrink: 0;
 }
+
 .section-selector {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
-    gap: 8px;
     flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
+.section-selector::-webkit-scrollbar,
+.day-filter::-webkit-scrollbar { display: none; }
 
 .section-chip {
-    min-width: 0;
-    height: 40px;
-    padding: 0 12px;
+    flex: 0 0 auto;
+    min-width: 52px;
+    height: var(--touch);
+    padding: 0 14px;
     border-radius: var(--radius-sm);
     font-size: 0.95rem;
     font-weight: 600;
@@ -284,6 +341,7 @@ input { font-family: inherit; }
     color: var(--text-secondary);
     background: var(--surface);
     border: 1px solid var(--border);
+    scroll-snap-align: center;
     transition: background var(--fast) var(--ease),
                 color var(--fast) var(--ease),
                 border-color var(--fast) var(--ease),
@@ -307,35 +365,38 @@ input { font-family: inherit; }
     pointer-events: none;
 }
 
-/* ---------- Day filter (equal width, Monday–Friday) ---------- */
+/* Day filter (Monday–Friday): equal-height, never wraps, scrolls on phones */
 .day-filter {
-    max-width: 720px;
-    margin: 12px auto 0;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 8px;
-}
-.day-filter:has(> .day-chip:nth-child(4):last-child) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.day-filter:has(> .day-chip:nth-child(3):last-child) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: var(--container);
+    margin: var(--space-3) auto 0;
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .day-chip {
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 56px;
+    height: var(--touch);
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
-    padding: 9px 8px 8px;
+    padding: 0 10px;
     border-radius: var(--radius-sm);
     font-size: 0.84rem;
     font-weight: 500;
     color: var(--text-secondary);
     background: var(--surface);
     border: 1px solid var(--border);
+    scroll-snap-align: center;
     transition: background var(--fast) var(--ease),
                 color var(--fast) var(--ease),
                 border-color var(--fast) var(--ease),
@@ -367,13 +428,15 @@ input { font-family: inherit; }
     opacity: 0.75;
 }
 
-/* ---------- Main layout ---------- */
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
 main {
     flex: 1;
     width: 100%;
-    max-width: 720px;
+    max-width: var(--container);
     margin: 0 auto;
-    padding: 20px 16px 40px;
+    padding: var(--space-4) 14px var(--space-6);
 }
 
 /* ---------- Real loading state ---------- */
@@ -395,81 +458,18 @@ main {
     animation: spin 0.7s linear infinite;
 }
 
-/* ---------- Timeline emphasis (highlighted class) ---------- */
-.tl-item.highlight .tl-card {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
-        0 4px 18px color-mix(in srgb, var(--primary) 12%, transparent);
-}
-.tl-item.highlight .tl-marker {
-    background: var(--primary);
-    box-shadow: 0 0 0 4px var(--primary-soft);
-}
-
-.status-next { color: var(--on-primary); background: var(--primary); }
-
-.tl-countdown {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 12px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-.tl-countdown svg { color: var(--primary); flex-shrink: 0; }
-
-.progress-wrap { margin-top: 14px; }
-.progress-track {
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-3);
-    overflow: hidden;
-}
-.progress-fill {
-    height: 100%;
-    width: 0%;
-    border-radius: var(--radius-pill);
-    background: var(--primary);
-    transition: width 1s linear;
-}
-.progress-meta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 6px;
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Timeline empty / all-done banner (replaces the old hero empty state) */
-.tl-done {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    text-align: center;
-    padding: 34px 16px 28px;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    animation: rise var(--med) var(--ease) both;
-}
-.tl-done-icon { display: grid; place-items: center; color: var(--success); margin-bottom: 8px; }
-.tl-done.empty .tl-done-icon { color: var(--text-tertiary); }
-.tl-done strong { color: var(--text); font-size: 1.05rem; font-weight: 650; }
-.tl-done span { color: var(--text-tertiary); font-size: 0.85rem; }
-
-/* ---------- Section headings (subtle dividers) ---------- */
+/* ============================================================
+   SECTION HEADINGS
+   ============================================================ */
 .section-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
-    margin: 26px 0 12px;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 var(--space-3);
 }
 .section-head h2 {
-    font-size: 1rem;
+    font-size: clamp(0.95rem, 2vw, 1.05rem);
     font-weight: 650;
     letter-spacing: -0.01em;
     color: var(--text);
@@ -480,19 +480,22 @@ main {
     font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Timeline ---------- */
+/* ============================================================
+   TIMELINE — compact mobile cards that reflow vertically
+   ============================================================ */
 .timeline { list-style: none; position: relative; }
 
+/* Tight left gutter; the line hugs the cards so cards take most of the width */
 .tl-item {
     position: relative;
-    padding: 0 0 14px 22px;
+    padding: 0 0 var(--space-3) 14px;
 }
 .tl-item::before {
     content: '';
     position: absolute;
-    left: 4px;
-    top: 22px;
-    bottom: -6px;
+    left: 3px;
+    top: 20px;
+    bottom: -4px;
     width: 1px;
     background: var(--border-strong);
 }
@@ -500,10 +503,10 @@ main {
 
 .tl-marker {
     position: absolute;
-    left: 0;
-    top: 18px;
-    width: 9px;
-    height: 9px;
+    left: -1px;
+    top: 16px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--border-strong);
     border: 2px solid var(--bg);
@@ -523,12 +526,16 @@ main {
     background: var(--border-strong);
 }
 
+/* Mobile card: a vertical flex stack so content reflows to
+   Title → Faculty → Room → badges → time → countdown. */
 .tl-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 14px 16px;
+    padding: 12px 14px;
     box-shadow: var(--shadow-1);
+    display: flex;
+    flex-direction: column;
     transition: border-color var(--fast) var(--ease),
                 box-shadow var(--fast) var(--ease),
                 background var(--fast) var(--ease),
@@ -551,17 +558,33 @@ main {
 }
 .tl-item.completed .tl-card:hover { opacity: 0.8; }
 
-.tl-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+/* Vertical stacking order on phones (order is ignored once the card becomes
+   a block box on tablets/desktops): title/meta/badge, room change, time,
+   progress, then the live countdown. */
+.tl-card-top { order: 0; }
+.room-change-badge { order: 1; }
+.tl-time-row { order: 2; }
+.progress-wrap { order: 3; }
+.tl-countdown { order: 4; }
+
+.tl-card-top {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+}
+.tl-card-top > .status-badge { align-self: flex-start; }
+
 .tl-subject {
-    font-size: 1rem;
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
     font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.3;
     color: var(--text);
 }
 .tl-meta {
     color: var(--text-secondary);
-    font-size: 0.82rem;
-    margin-top: 4px;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    margin-top: var(--space-1);
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -574,33 +597,17 @@ main {
 }
 .tl-meta .tl-room svg { flex-shrink: 0; }
 
-.tl-time-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-    font-variant-numeric: tabular-nums;
-}
-.tl-duration {
-    margin-left: auto;
-    font-size: 0.74rem;
-    color: var(--text-tertiary);
-    background: var(--surface-3);
-    border: 1px solid var(--border);
-    padding: 2px 9px;
-    border-radius: var(--radius-pill);
-}
-
+/* Status badges wrap gracefully; they can never spill outside a card */
 .status-badge {
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.02em;
-    padding: 3px 10px;
+    padding: 4px 10px;
     border-radius: var(--radius-pill);
     flex-shrink: 0;
-    white-space: nowrap;
+    max-width: 100%;
+    text-align: center;
+    white-space: normal;
 }
 .status-completed { color: var(--success); background: var(--success-soft); }
 .status-current { color: var(--primary-text); background: var(--primary-soft); }
@@ -617,7 +624,8 @@ main {
     color: var(--warning);
     background: var(--warning-soft);
     border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
-    margin-top: 10px;
+    margin-top: var(--space-2);
+    align-self: flex-start;
     animation: flash-in var(--med) var(--ease);
 }
 .room-change-badge svg { flex-shrink: 0; }
@@ -626,12 +634,86 @@ main {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Time row */
+.tl-time-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+.tl-duration {
+    margin-left: auto;
+    font-size: 0.74rem;
+    color: var(--text-tertiary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+}
+
+/* Countdown: icon column + text column; the label wraps onto its own line
+   ("Starts in" / "3 hr 34 min") rather than overflowing. */
+.tl-countdown {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 7px;
+    margin-top: var(--space-3);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+.tl-countdown svg { color: var(--primary); flex-shrink: 0; margin-top: 2px; }
+.tl-countdown span { min-width: 0; }
+
+/* Progress */
+.progress-wrap { margin-top: var(--space-3); }
+.progress-track {
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    transition: width 1s linear;
+}
+.progress-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Timeline emphasis (highlighted class) */
+.tl-item.highlight .tl-card {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
+        0 4px 18px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.tl-item.highlight .tl-marker {
+    background: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+.status-next { color: var(--on-primary); background: var(--primary); }
+
 /* Break marker */
 .tl-break {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 0 14px 22px;
+    gap: var(--space-3);
+    padding: 0 0 var(--space-3) 14px;
     color: var(--text-tertiary);
     font-size: 0.78rem;
 }
@@ -652,10 +734,27 @@ main {
     font-size: 0.9rem;
 }
 
+/* Timeline empty / all-done banner (replaces the old hero empty state) */
+.tl-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    text-align: center;
+    padding: var(--space-6) var(--space-4) 28px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    animation: rise var(--med) var(--ease) both;
+}
+.tl-done-icon { display: grid; place-items: center; color: var(--success); margin-bottom: var(--space-2); }
+.tl-done.empty .tl-done-icon { color: var(--text-tertiary); }
+.tl-done strong { color: var(--text); font-size: 1.05rem; font-weight: 650; }
+.tl-done span { color: var(--text-tertiary); font-size: 0.85rem; }
+
 /* ---------- State card (empty / error) ---------- */
 .state-card {
     border-radius: var(--radius-lg);
-    padding: 48px 24px;
+    padding: 48px var(--space-4);
     text-align: center;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -666,12 +765,16 @@ main {
     display: grid;
     place-items: center;
     color: var(--text-tertiary);
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
 }
 .state-card h3 { font-size: 1.15rem; font-weight: 650; margin-bottom: 6px; }
-.state-card p { color: var(--text-secondary); font-size: 0.9rem; max-width: 380px; margin: 0 auto 16px; }
+.state-card p { color: var(--text-secondary); font-size: 0.9rem; max-width: 380px; margin: 0 auto var(--space-4); }
 
 .btn {
+    min-height: var(--touch);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 10px 22px;
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
@@ -691,19 +794,19 @@ main {
 /* ---------- Footer ---------- */
 .app-footer {
     text-align: center;
-    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: var(--space-5) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
     color: var(--text-tertiary);
     font-size: 0.78rem;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
 }
 .last-updated { font-weight: 500; color: var(--text-secondary); }
 
 /* ---------- Toast ---------- */
 .toast {
     position: fixed;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translate(-50%, 80px);
     background: var(--surface-solid);
@@ -743,11 +846,11 @@ main {
     position: relative;
     width: 100%;
     max-width: 480px;
-    margin: 0 16px;
+    margin: 0 var(--space-4);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     border-bottom: none;
     background: var(--surface-solid);
-    padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0px));
+    padding: var(--space-5) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
     transform: translateY(100%);
     transition: transform var(--med) var(--ease);
 }
@@ -759,6 +862,7 @@ main {
     gap: 10px;
 }
 .section-option {
+    min-height: var(--touch);
     padding: 15px 12px;
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -797,10 +901,71 @@ main {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+    html { scroll-behavior: auto; }
 }
 
-/* ---------- Small screens ---------- */
-@media (max-width: 480px) {
-    .brand h1 { font-size: 1.2rem; }
-    .date-line { font-size: 0.8rem; }
+/* ============================================================
+   TABLET & DESKTOP ENHANCEMENTS (min-width: 768px)
+   Selectors become static grids; timeline cards open back up
+   into the classic horizontal header layout.
+   ============================================================ */
+@media (min-width: 768px) {
+    .app-header {
+        padding: calc(12px + env(safe-area-inset-top, 0px)) var(--space-4) 12px;
+    }
+
+    .brand h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); }
+
+    .section-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+        overflow: visible;
+        padding: 0;
+    }
+    .section-chip { min-width: 0; padding: 0 12px; }
+
+    .day-filter {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        overflow: visible;
+        padding: 0;
+    }
+    .day-chip { min-width: 0; }
+    .day-filter:has(> .day-chip:nth-child(4):last-child) {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .day-filter:has(> .day-chip:nth-child(3):last-child) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    main { padding: var(--space-5) var(--space-4) var(--space-6); }
+
+    /* Timeline: restore horizontal card header + original vertical flow */
+    .tl-card { display: block; padding: 14px 16px; }
+    .tl-card-top {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    .tl-card-top > .status-badge { align-self: auto; }
+    .status-badge { white-space: nowrap; }
+
+    .tl-time-row { margin-top: 10px; }
+
+    .tl-countdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 12px;
+    }
+    .tl-countdown svg { margin-top: 0; }
+
+    .progress-wrap { margin-top: 14px; }
+    .room-change-badge { margin-top: 10px; }
+
+    .tl-item { padding-left: 22px; }
+    .tl-item::before { left: 4px; top: 22px; }
+    .tl-marker { left: 0; top: 18px; width: 9px; height: 9px; }
+    .tl-break { padding-left: 22px; }
 }

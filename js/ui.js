@@ -102,6 +102,19 @@ export function renderDayFilter(selectedDay) {
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
+    // Snap the active chip into view on phones (no-op when the row doesn't
+    // scroll, e.g. the static desktop grid).
+    scrollChipIntoView(container, container.querySelector('.day-chip.active'), 'activeDay', selectedDay);
+}
+
+// Only scroll when the selection actually changed, so we never fight the user
+// scrolling the row by hand while the live clock re-renders.
+function scrollChipIntoView(container, chip, attr, value) {
+    if (!chip || container.dataset[attr] === String(value)) return;
+    container.dataset[attr] = String(value);
+    if (container.scrollWidth <= container.clientWidth + 1) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    chip.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
 }
 
 // Idempotent: rebuilds only when the set of available sections changes.
@@ -133,6 +146,7 @@ export function renderSectionSelector(sections, selectedSection) {
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
+    scrollChipIntoView(container, container.querySelector('.section-chip.active'), 'activeSection', selectedSection);
 }
 
 // Arrow / Home / End keyboard navigation for chip groups.

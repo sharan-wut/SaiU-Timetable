@@ -63,7 +63,9 @@ function initTheme() {
 // Derive the available sections from the data and resolve the selected one.
 // Called whenever the parsed timetable changes (cache or network).
 function syncSections() {
-    sections = [...new Set(classes.map(c => c.section))].sort((a, b) => a - b);
+    // Guard against stale caches (older app versions) that can lack a
+    // `section` field — an undefined section would poison the selector.
+    sections = [...new Set(classes.map(c => c.section).filter(Number.isFinite))].sort((a, b) => a - b);
     if (!sections.length) return;
 
     if (selectedSection == null) {
