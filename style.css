@@ -250,11 +250,25 @@ input { font-family: inherit; }
 }
 .sidebar-refresh-btn:hover { background: var(--surface-2); color: var(--text); }
 .sidebar-refresh-btn.spinning svg { animation: spin 0.7s linear infinite; }
+
+.sidebar-install-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; height: 36px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #fff;
+    background: #C94C4C;
+    transition: filter var(--fast);
+}
+.sidebar-install-btn:hover { filter: brightness(1.1); }
+
 .last-updated {
     font-size: 0.68rem;
     color: var(--text-tertiary);
     text-align: center;
-    margin-top: 6px;
+    margin-top: 9px;
 }
 .sidebar-credit {
     font-size: 0.62rem;
@@ -266,7 +280,7 @@ input { font-family: inherit; }
 
 .main-footer {
     text-align: center;
-    padding: 24px 0;
+    padding: 27px 0;
     font-size: 0.80rem;
     color: var(--text-tertiary);
     opacity: 0.5;
