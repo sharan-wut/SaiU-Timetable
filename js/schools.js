@@ -25,15 +25,6 @@ export const SCHOOLS = [
                 parser: 'grid',
                 trackedCourses: null,
             },
-            {
-                id: 'scds-3',
-                label: 'Year 3',
-                sections: null,
-                sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
-                gid: '0',
-                parser: 'grid',
-                trackedCourses: null,
-            },
         ],
     },
     {
