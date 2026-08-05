@@ -18,7 +18,9 @@ const SECTION_REGEX = /\(Sec\s*(\d+)\)/i;
  * @param {string[]} [trackedCourses] - optional filter list for course names
  */
 export function parseCSV(text, parserType = 'grid', trackedCourses = null) {
-    const raw = parserType === 'list' ? parseListCSV(text) : parseGridCSV(text);
+    const raw = parserType === 'list'
+        ? parseListCSV(text)
+        : parseGridCSV(text, trackedCourses);
     if (!trackedCourses || !trackedCourses.length) return raw;
 
     // Normalize tracked names for case-insensitive prefix matching.
@@ -33,10 +35,15 @@ export function parseCSV(text, parserType = 'grid', trackedCourses = null) {
 // Grid parser (SCDS format)
 // ============================================================
 
-function parseGridCSV(text) {
+function parseGridCSV(text, trackedCourses = null) {
     const lines = text.split(/\r?\n/);
     const data = [];
     let currentDay = null;
+
+    // Build a lookup for fast tracked-course matching
+    const trackedSet = trackedCourses
+        ? new Set(trackedCourses.map(c => c.trim().toLowerCase()))
+        : null;
 
     for (let i = 0; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
@@ -60,23 +67,41 @@ function parseGridCSV(text) {
             if (!cell) continue;
 
             const sectionMatch = cell.match(SECTION_REGEX);
-            if (!sectionMatch) continue;
 
-            const section = parseInt(sectionMatch[1], 10);
-            if (!section) continue;
+            if (sectionMatch) {
+                // Sectioned cell — always parse (existing behavior)
+                const section = parseInt(sectionMatch[1], 10);
+                if (!section) continue;
 
-            const room = findRoom(lines, i, j);
-            const { subject, faculty } = splitSubjectFaculty(cell);
+                const room = findRoom(lines, i, j);
+                const { subject, faculty } = splitSubjectFaculty(cell);
 
-            data.push({
-                day: currentDay,
-                subject,
-                faculty,
-                room,
-                section,
-                startTime: times.start,
-                endTime: times.end,
-            });
+                data.push({
+                    day: currentDay,
+                    subject,
+                    faculty,
+                    room,
+                    section,
+                    startTime: times.start,
+                    endTime: times.end,
+                });
+            } else if (trackedSet) {
+                // Unsectioned cell — only parse when tracked courses are active
+                const { subject, faculty } = splitSubjectFaculty(cell);
+                const subjLower = subject.trim().toLowerCase();
+                if (subjLower && [...trackedSet].some(t => subjLower === t || subjLower.startsWith(t) || t.startsWith(subjLower))) {
+                    const room = findRoom(lines, i, j);
+                    data.push({
+                        day: currentDay,
+                        subject,
+                        faculty,
+                        room,
+                        section: 1,
+                        startTime: times.start,
+                        endTime: times.end,
+                    });
+                }
+            }
         }
     }
     return data;
