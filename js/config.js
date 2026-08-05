@@ -1,22 +1,19 @@
 /**
  * Central configuration.
- * Change SHEET_ID here — the rest of the app reads from CONFIG.
- * Sections are NOT configured here: they are discovered from the "(Sec N)"
- * labels in the published Google Sheet, so adding a section is a data-only change.
+ *
+ * SHEET_ID and GID are now resolved dynamically per school/year via
+ * navigation.js. The values here are used only as a fallback when no
+ * navigation state is available (e.g. first paint before init completes).
  */
 export const CONFIG = {
+    // Fallback sheet (used only when navigation state is not yet resolved).
     SHEET_ID: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
     GID: '0',
 
-    // Google Analytics 4 Measurement ID. Configured once in index.html
-    // <head> (the analytics bootstrap); this reads it back so the value
-    // never needs to be duplicated here.
     GA_ID: (window.__TT_GA && window.__TT_GA.id) || '',
 
-    REFRESH_INTERVAL: 5 * 60 * 1000, // auto-refresh period (ms)
+    REFRESH_INTERVAL: 5 * 60 * 1000,
 
-    // Active weekdays shown in the selector and used by navigation.
-    // Weekends are excluded by default; add them here to re-enable.
     WEEKDAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
 
     // Cache keys (localStorage)
@@ -24,9 +21,7 @@ export const CONFIG = {
     ROOMS_KEY: 'tt-room-map-v3',
     SECTION_KEY: 'tt-section',
 
-    // Any gap between classes >= this many minutes is shown as a break
     BREAK_THRESHOLD_MIN: 40,
-    // Gaps overlapping this window are labelled "Lunch" instead of "Break"
     LUNCH_START: 12 * 60,
     LUNCH_END: 15 * 60,
 };

@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { parseCSV } from './parser.js';
-import { getCachedTimetable, setCachedTimetable, updateRoomMap, getTheme, setTheme, getSection, setSection } from './storage.js';
+import { getTheme as getStoredTheme, setTheme as setStoredTheme, getSection as getStoredSection, setSection as setStoredSection } from './storage.js';
+import * as nav from './navigation.js';
 import * as ui from './ui.js';
 import { todayName, nowMinutes, nextSchoolDay, isSchoolDay } from './utils.js';
 import { init as initAnalytics, trackEvent } from './analytics.js';
@@ -9,11 +10,9 @@ import { init as initAnalytics, trackEvent } from './analytics.js';
  * App bootstrap, fetch, and interactivity.
  */
 
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/export?format=csv&gid=${CONFIG.GID}`;
-
-let classes = [];             // all classes for every section found in the sheet
-let sections = [];            // unique section numbers present in the data
-let selectedSection = getSection(); // remembered section; null on first visit
+let classes = [];
+let sections = [];
+let selectedSection = null;
 let lastUpdated = null;
 let selectedDay = null;
 let countdownTimer = null;
@@ -22,21 +21,15 @@ let lastFeatureKey = null;
 
 const $ = (sel) => document.querySelector(sel);
 
-// The day the app treats as "now": today on weekdays, the next school day on
-// the weekend (so the timetable is never empty just because it's Saturday).
 function contextDay() {
     const t = todayName();
     return isSchoolDay(t) ? t : nextSchoolDay(t);
 }
 
-// The timetable for the currently selected section only.
-// Everything downstream (timeline, preview, countdown, search) works
-// on this filtered list — no per-section code duplication.
 function sectionClasses() {
     return selectedSection == null ? [] : classes.filter(c => c.section === selectedSection);
 }
 
-// Resolve a theme preference ("light" | "dark" | "system") to a concrete one.
 function effectiveTheme(preference) {
     return preference === 'system'
         ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
@@ -44,7 +37,7 @@ function effectiveTheme(preference) {
 }
 
 function setThemeUI() {
-    const preference = getTheme();
+    const preference = getStoredTheme();
     const eff = effectiveTheme(preference);
     document.documentElement.classList.remove('light-theme', 'dark-theme');
     document.documentElement.classList.add(eff + '-theme');
@@ -56,39 +49,107 @@ function setThemeUI() {
 function initTheme() {
     const media = matchMedia('(prefers-color-scheme: light)');
     media.addEventListener?.('change', () => {
-        // Only react to the OS when the user is on "System" mode.
-        if (getTheme() === 'system') setThemeUI();
+        if (getStoredTheme() === 'system') setThemeUI();
     });
 }
 
-// Derive the available sections from the data and resolve the selected one.
-// Called whenever the parsed timetable changes (cache or network).
-function syncSections() {
-    // Guard against stale caches (older app versions) that can lack a
-    // `section` field — an undefined section would poison the selector.
-    sections = [...new Set(classes.map(c => c.section).filter(Number.isFinite))].sort((a, b) => a - b);
-    if (!sections.length) return;
+// ============================================================
+// Navigation state rendering
+// ============================================================
 
-    if (selectedSection == null) {
-        // First visit — ask the user once, then remember their choice.
-        if (!sectionModalShown) {
-            sectionModalShown = true;
-            ui.showSectionModal(sections, (s) => {
-                selectedSection = s;
-                setSection(s);
-                render();
-            });
+function renderNavigation() {
+    const school = nav.getSchool();
+    const program = nav.getProgram();
+    const year = nav.getYear();
+
+    // Desktop selectors
+    ui.renderSchoolSelector(nav.availableSchools(), school?.id || null);
+    ui.renderProgramSelector(nav.availablePrograms(), program?.id || null, nav.showProgramSelector());
+    ui.renderYearSelector(nav.availableYears(), year?.id || null);
+    ui.renderSectionSelector(sections, selectedSection);
+
+    // Mobile drawer
+    ui.renderDrawer({
+        schools: nav.availableSchools(),
+        schoolId: school?.id || null,
+        programs: nav.availablePrograms(),
+        programId: program?.id || null,
+        years: nav.availableYears(),
+        yearId: year?.id || null,
+        sections: nav.availableSections(),
+        sectionId: selectedSection,
+    });
+
+    // Update title
+    const titleEl = $('#app-title');
+    if (titleEl) {
+        const parts = [school?.shortName || 'Timetable'];
+        if (nav.showProgramSelector() && program) parts.push(program.label);
+        if (year) parts.push(year.label);
+        titleEl.textContent = parts.join(' · ');
+    }
+
+    // Section label in footer
+    const label = $('#section-label');
+    if (label) label.textContent = selectedSection ?? '';
+
+    // Section row visibility
+    const sectionRow = $('.section-row');
+    if (sectionRow) sectionRow.classList.toggle('hidden', !nav.showSectionSelector());
+}
+
+function syncSections() {
+    const yearConfig = nav.getYear();
+    if (!yearConfig) return;
+
+    const yearSections = yearConfig.sections || [];
+    if (yearSections.length) {
+        sections = yearSections;
+        if (selectedSection == null) {
+            if (!sectionModalShown) {
+                sectionModalShown = true;
+                ui.showSectionModal(sections, (s) => {
+                    selectedSection = s;
+                    nav.navigateToSection(s);
+                    render();
+                });
+            }
+        } else if (!sections.includes(selectedSection)) {
+            selectedSection = sections[0];
+            nav.navigateToSection(selectedSection);
         }
-    } else if (!sections.includes(selectedSection)) {
-        // Remembered section no longer exists in the data (e.g. sheet changed).
-        selectedSection = sections[0];
-        setSection(selectedSection);
+    } else {
+        sections = [];
+        selectedSection = null;
     }
 }
 
+// ============================================================
+// Data loading
+// ============================================================
+
+function getCacheKey() {
+    const year = nav.getYear();
+    if (!year) return CONFIG.CACHE_KEY;
+    return `tt-cache-${year.id}`;
+}
+
+function getRoomCacheKey() {
+    const year = nav.getYear();
+    if (!year) return CONFIG.ROOMS_KEY;
+    return `tt-rooms-${year.id}`;
+}
+
 async function load({ silent = false, background = false } = {}) {
-    // 1. Show cached data immediately (offline-first)
-    const cached = getCachedTimetable();
+    const sheetUrl = nav.getSheetUrl();
+    if (!sheetUrl) {
+        ui.renderError();
+        return;
+    }
+
+    // 1. Show cached data immediately
+    const cacheKey = getCacheKey();
+    const cached = readCache(cacheKey);
     if (cached && cached.classes) {
         classes = cached.classes;
         if (cached.savedAt) lastUpdated = new Date(cached.savedAt);
@@ -103,15 +164,17 @@ async function load({ silent = false, background = false } = {}) {
     // 2. Fetch fresh data
     ui.setRefreshSpinning(!silent);
     try {
-        const res = await fetch(SHEET_URL);
+        const res = await fetch(sheetUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
-        const parsed = parseCSV(text);
+        const parserType = nav.getParserType();
+        const trackedCourses = nav.getTrackedCourses();
+        const parsed = parseCSV(text, parserType, trackedCourses);
         if (!parsed.length) throw new Error('No classes parsed');
         classes = parsed;
         lastUpdated = new Date();
-        setCachedTimetable(classes);
-        updateRoomMap(classes);
+        writeCache(cacheKey, classes);
+        updateRoomMapWithKey(classes);
         syncSections();
         render();
         trackEvent('timetable_refreshed', { source: background ? 'background' : silent ? 'manual' : 'initial' });
@@ -124,10 +187,51 @@ async function load({ silent = false, background = false } = {}) {
     }
 }
 
+function readCache(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+
+function writeCache(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), classes: data }));
+    } catch { /* full */ }
+}
+
+function updateRoomMapWithKey(classes) {
+    const key = getRoomCacheKey();
+    const PLACEHOLDER_ROOMS = /^(tba|tbd|to be announced|to be decided|room tba|n\/?a)$/i;
+    let map = {};
+    try {
+        const raw = localStorage.getItem(key);
+        map = raw ? JSON.parse(raw) : {};
+    } catch { map = {}; }
+
+    for (const c of classes) {
+        const classKey = `${c.subject}|${c.faculty}|${c.section ?? ''}|${c.day ?? ''}|${c.startTime ?? ''}`;
+        const rawRoom = String(c.room ?? '').replace(/\s+/g, ' ').trim();
+        const room = rawRoom && !PLACEHOLDER_ROOMS.test(rawRoom) ? rawRoom.toLowerCase() : '';
+        const prevRaw = String(map[classKey] ?? '').trim();
+        const prev = prevRaw && !PLACEHOLDER_ROOMS.test(prevRaw) ? prevRaw.toLowerCase() : '';
+        if (room && prev && prev !== room) {
+            c.roomChanged = true;
+            c.originalRoom = prevRaw;
+        }
+        if (room) map[classKey] = rawRoom;
+    }
+    try { localStorage.setItem(key, JSON.stringify(map)); } catch { /* full */ }
+}
+
+// ============================================================
+// Render
+// ============================================================
+
 function render() {
     ui.hideLoading();
     ui.renderDateLine();
-    ui.renderSectionSelector(sections, selectedSection);
+    renderNavigation();
     const day = selectedDay || contextDay();
     ui.renderDayFilter(day);
     ui.renderSuccess();
@@ -141,9 +245,11 @@ function render() {
         : 'none';
 
     ui.setLastUpdated(lastUpdated || new Date());
-    const label = $('#section-label');
-    if (label) label.textContent = selectedSection ?? '';
 }
+
+// ============================================================
+// Countdown
+// ============================================================
 
 function startCountdown() {
     stopCountdown();
@@ -156,12 +262,10 @@ function startCountdown() {
             ? `${(ctx.current || ctx.next).subject}|${(ctx.current || ctx.next).startTime}|${ctx.current ? 1 : 0}`
             : 'none';
         if (key !== lastFeatureKey) {
-            // Class started / ended since the last render — refresh the timeline.
             lastFeatureKey = key;
             render();
             return;
         }
-        // Same highlighted class: just tick the countdown / progress bar in place.
         if (day === todayName()) ui.updateLiveClock(now, ctx.current, ctx.next);
     }, 60 * 1000);
 }
@@ -170,7 +274,10 @@ function stopCountdown() {
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
 }
 
-// --- Pull to refresh ---
+// ============================================================
+// Pull to refresh
+// ============================================================
+
 const pull = $('.pull-indicator');
 let pullStart = 0;
 let pulling = false;
@@ -178,6 +285,7 @@ let pulling = false;
 function initPullToRefresh() {
     const threshold = 90;
     window.addEventListener('touchstart', (e) => {
+        if (ui.isDrawerOpen()) return;
         if (window.scrollY <= 0) { pullStart = e.touches[0].clientY; pulling = true; }
     }, { passive: true });
     window.addEventListener('touchmove', (e) => {
@@ -198,13 +306,15 @@ function initPullToRefresh() {
     }, { passive: true });
 }
 
+// ============================================================
+// Search
+// ============================================================
+
 function initSearch() {
     const input = $('.search-input');
     const clear = $('.search-clear');
     let searchTimer = null;
 
-    // Only the timeline depends on the query, so a keystroke re-renders just
-    // that instead of the whole app (day / section stay untouched).
     const renderTimelineOnly = () => {
         const day = selectedDay || contextDay();
         const now = nowMinutes();
@@ -219,7 +329,6 @@ function initSearch() {
         clearTimeout(searchTimer);
         const q = input.value.trim();
         if (!q) return;
-        // Debounce so a burst of keystrokes records one search, not N.
         searchTimer = setTimeout(() => trackEvent('search_used', { search_term: q }), 600);
     });
     clear.addEventListener('click', () => {
@@ -241,15 +350,24 @@ function initSearch() {
     });
 }
 
+// ============================================================
+// Header actions
+// ============================================================
+
 function initHeaderActions() {
-    $('#refresh-btn').addEventListener('click', () => load({ silent: true }));
-    $('#theme-btn').addEventListener('click', () => {
-        const next = { dark: 'light', light: 'system', system: 'dark' }[getTheme()] || 'light';
-        setTheme(next);
+    $('#refresh-btn')?.addEventListener('click', () => load({ silent: true }));
+
+    const cycleTheme = () => {
+        const next = { dark: 'light', light: 'system', system: 'dark' }[getStoredTheme()] || 'light';
+        setStoredTheme(next);
         setThemeUI();
         trackEvent('theme_changed', { theme: next });
-    });
-    $('#install-btn').addEventListener('click', () => {
+    };
+
+    $('#theme-btn')?.addEventListener('click', cycleTheme);
+    $('.drawer-theme-btn')?.addEventListener('click', cycleTheme);
+
+    $('#install-btn')?.addEventListener('click', () => {
         if (window.deferredPrompt) {
             window.deferredPrompt.prompt();
             window.deferredPrompt.userChoice.then(() => { window.deferredPrompt = null; });
@@ -257,8 +375,42 @@ function initHeaderActions() {
             ui.showToast('Open the browser menu → "Install app"');
         }
     });
-    $('.retry-btn').addEventListener('click', () => load());
+    $('.retry-btn')?.addEventListener('click', () => load());
 }
+
+// ============================================================
+// Hamburger / drawer
+// ============================================================
+
+function initHamburger() {
+    const btn = $('#hamburger-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            if (ui.isDrawerOpen()) ui.closeDrawer();
+            else ui.openDrawer();
+        });
+    }
+
+    const overlay = $('#drawer-overlay');
+    if (overlay) {
+        overlay.addEventListener('click', () => ui.closeDrawer());
+    }
+
+    const closeBtn = $('.drawer-close-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => ui.closeDrawer());
+    }
+
+    // Close section modal on backdrop click
+    const modalBackdrop = $('.section-modal-backdrop');
+    if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', () => ui.hideSectionModal());
+    }
+}
+
+// ============================================================
+// Navigation event handlers
+// ============================================================
 
 function initDayFilter() {
     window.addEventListener('daychange', (e) => {
@@ -273,9 +425,43 @@ function initSectionSelector() {
         const s = e.detail.section;
         if (s === selectedSection) return;
         selectedSection = s;
-        setSection(s);
+        nav.navigateToSection(s);
         trackEvent('section_changed', { section: s });
         render();
+        ui.closeDrawer();
+    });
+}
+
+function initNavigationListeners() {
+    window.addEventListener('schoolchange', (e) => {
+        nav.navigateToSchool(e.detail.schoolId);
+        selectedSection = null;
+        sectionModalShown = false;
+        trackEvent('school_changed', { school: e.detail.schoolId });
+        load();
+        ui.closeDrawer();
+    });
+
+    window.addEventListener('programchange', (e) => {
+        nav.navigateToProgram(e.detail.programId);
+        selectedSection = null;
+        sectionModalShown = false;
+        trackEvent('program_changed', { program: e.detail.programId });
+        load();
+        ui.closeDrawer();
+    });
+
+    window.addEventListener('yearchange', (e) => {
+        nav.navigateToYear(e.detail.yearId);
+        selectedSection = null;
+        sectionModalShown = false;
+        trackEvent('year_changed', { year: e.detail.yearId });
+        load();
+        ui.closeDrawer();
+    });
+
+    window.addEventListener('navchange', () => {
+        renderNavigation();
     });
 }
 
@@ -283,8 +469,6 @@ function initAutoRefresh() {
     setInterval(() => load({ background: true }), CONFIG.REFRESH_INTERVAL);
 }
 
-// True when the app is already running as an installed app (desktop or mobile),
-// in any display mode the platform may use.
 function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
         window.matchMedia('(display-mode: fullscreen)').matches ||
@@ -295,10 +479,6 @@ function isStandalone() {
 
 function initPWA() {
     if ('serviceWorker' in navigator) {
-        // Live Server / local dev: never use a service worker. A stale worker
-        // serves cached files, so edits and live-reload never show up.
-        // sw.js also self-disarms on dev hosts; this unregister is a safety net
-        // for any worker that was registered before that guard existed.
         const devHost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(location.hostname);
         if (devHost || !location.protocol.startsWith('https')) {
             navigator.serviceWorker.getRegistrations()
@@ -309,7 +489,6 @@ function initPWA() {
         }
     }
 
-    // Inside the installed app the install button is meaningless — never show it.
     if (isStandalone()) return;
 
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -324,17 +503,51 @@ function initPWA() {
     });
 }
 
+// ============================================================
+// Legacy section persistence migration
+// ============================================================
+
+function migrateLegacySection() {
+    const legacySection = getStoredSection();
+    if (legacySection != null) {
+        setStoredSection(null);
+        const year = nav.getYear();
+        if (year && year.sections && year.sections.includes(legacySection)) {
+            selectedSection = legacySection;
+            nav.navigateToSection(legacySection);
+        }
+    }
+}
+
+// ============================================================
+// Bootstrap
+// ============================================================
+
 function init() {
     initAnalytics();
     initTheme();
     setThemeUI();
     initPWA();
+
+    // Set footer year
+    const yearEl = $('#year');
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+    nav.initNavigation();
+    migrateLegacySection();
+
+    const navState = nav.getState();
+    selectedSection = navState.section;
+
+    initHamburger();
     initPullToRefresh();
     initSearch();
     initHeaderActions();
     initDayFilter();
     initSectionSelector();
+    initNavigationListeners();
     initAutoRefresh();
+
     load();
     startCountdown();
 }

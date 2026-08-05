@@ -27,6 +27,13 @@ const ICONS = {
     circleAlert: svg('<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>', 40),
     checkCircle: svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>', 40),
     coffee: svg('<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/>', 14),
+    menu: svg('<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>', 22),
+    chevronRight: svg('<path d="m9 18 6-6-6-6"/>', 16),
+    x: svg('<path d="M18 6 6 18M6 6l12 12"/>', 20),
+    school: svg('<path d="M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 2 6 2s6-.9 6-2v-5"/>', 18),
+    book: svg('<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>', 18),
+    calendar: svg('<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>', 18),
+    users: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', 18),
 };
 
 const THEME_CYCLE = { dark: 'light', light: 'system', system: 'dark' };
@@ -42,18 +49,24 @@ function byStart(a, b) {
 }
 
 export function setThemeIcon(preference) {
-    const btn = $('#theme-btn');
-    if (!btn) return;
-    btn.innerHTML = ICONS[preference] || ICONS.moon;
-    const next = THEME_CYCLE[preference] || 'light';
-    const label = `Switch to ${next} theme`;
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', label);
+    const btns = $$('.drawer-theme-btn, #theme-btn');
+    for (const btn of btns) {
+        btn.innerHTML = ICONS[preference] || ICONS.moon;
+        const next = THEME_CYCLE[preference] || 'light';
+        const label = `Switch to ${next} theme`;
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
+    }
 }
 
-// Real loading indicator: shown only while a fetch is in flight and there is
-// no cached data to paint immediately. A 150ms display gate prevents a flash
-// when the fetch resolves quickly.
+function $$(sel) {
+    return [...document.querySelectorAll(sel)];
+}
+
+// ============================================================
+// Loading / empty states
+// ============================================================
+
 export function showLoading() {
     const el = $('#loading-state');
     if (!el) return;
@@ -72,11 +85,14 @@ export function renderDateLine() {
     const d = new Date();
     const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
     const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    $('.date-line').innerHTML = `<strong>${weekday}</strong><span class="date-sep">·</span>${date}`;
+    const el = $('.date-line');
+    if (el) el.innerHTML = `<strong>${weekday}</strong><span class="date-sep">·</span>${date}`;
 }
 
-// Idempotent: builds the weekday chips once, then only toggles active state.
-// The chip set comes from CONFIG.WEEKDAYS, so weekends never render.
+// ============================================================
+// Day filter chips
+// ============================================================
+
 export function renderDayFilter(selectedDay) {
     const container = $('.day-filter');
     if (!container) return;
@@ -102,13 +118,9 @@ export function renderDayFilter(selectedDay) {
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
-    // Snap the active chip into view on phones (no-op when the row doesn't
-    // scroll, e.g. the static desktop grid).
     scrollChipIntoView(container, container.querySelector('.day-chip.active'), 'activeDay', selectedDay);
 }
 
-// Only scroll when the selection actually changed, so we never fight the user
-// scrolling the row by hand while the live clock re-renders.
 function scrollChipIntoView(container, chip, attr, value) {
     if (!chip || container.dataset[attr] === String(value)) return;
     container.dataset[attr] = String(value);
@@ -117,7 +129,10 @@ function scrollChipIntoView(container, chip, attr, value) {
     chip.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
 }
 
-// Idempotent: rebuilds only when the set of available sections changes.
+// ============================================================
+// Section selector chips
+// ============================================================
+
 export function renderSectionSelector(sections, selectedSection) {
     const container = $('#section-selector');
     if (!container) return;
@@ -149,7 +164,262 @@ export function renderSectionSelector(sections, selectedSection) {
     scrollChipIntoView(container, container.querySelector('.section-chip.active'), 'activeSection', selectedSection);
 }
 
+// ============================================================
+// Navigation selectors (school / program / year) — desktop chips
+// ============================================================
+
+export function renderSchoolSelector(schools, selectedId) {
+    const container = $('#school-selector');
+    if (!container) return;
+    const sig = schools.map(s => s.id).join(',');
+    if (container.dataset.sig !== sig) {
+        container.innerHTML = '';
+        container.dataset.sig = sig;
+        for (const s of schools) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'nav-chip';
+            btn.dataset.schoolId = s.id;
+            btn.textContent = s.shortName;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('aria-label', s.name);
+            btn.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('schoolchange', { detail: { schoolId: s.id } }));
+            });
+            container.appendChild(btn);
+        }
+        enableArrowNav(container);
+    }
+    for (const btn of container.children) {
+        const active = btn.dataset.schoolId === selectedId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+}
+
+export function renderProgramSelector(programs, selectedId, visible) {
+    const wrapper = $('#program-selector-wrapper');
+    const container = $('#program-selector');
+    if (!wrapper || !container) return;
+    wrapper.classList.toggle('hidden', !visible);
+    if (!visible) return;
+
+    const sig = programs.map(p => p.id).join(',');
+    if (container.dataset.sig !== sig) {
+        container.innerHTML = '';
+        container.dataset.sig = sig;
+        for (const p of programs) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'nav-chip';
+            btn.dataset.programId = p.id;
+            btn.textContent = p.label;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('aria-label', p.label);
+            btn.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('programchange', { detail: { programId: p.id } }));
+            });
+            container.appendChild(btn);
+        }
+        enableArrowNav(container);
+    }
+    for (const btn of container.children) {
+        const active = btn.dataset.programId === selectedId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+}
+
+export function renderYearSelector(years, selectedId) {
+    const container = $('#year-selector');
+    if (!container) return;
+    const sig = years.map(y => y.id).join(',');
+    if (container.dataset.sig !== sig) {
+        container.innerHTML = '';
+        container.dataset.sig = sig;
+        for (const y of years) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'nav-chip';
+            btn.dataset.yearId = y.id;
+            btn.textContent = y.label;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('aria-label', y.label);
+            btn.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('yearchange', { detail: { yearId: y.id } }));
+            });
+            container.appendChild(btn);
+        }
+        enableArrowNav(container);
+    }
+    for (const btn of container.children) {
+        const active = btn.dataset.yearId === selectedId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+}
+
+// ============================================================
+// Navigation drawer (mobile)
+// ============================================================
+
+let drawerFocusTrapCleanup = null;
+
+export function renderDrawer(state) {
+    const schoolList = $('#drawer-schools');
+    const programSection = $('#drawer-program-section');
+    const programList = $('#drawer-programs');
+    const yearList = $('#drawer-years');
+    const sectionList = $('#drawer-sections');
+
+    if (!schoolList) return;
+
+    // Schools
+    schoolList.innerHTML = '';
+    for (const s of state.schools) {
+        const btn = document.createElement('button');
+        btn.className = 'drawer-item' + (s.id === state.schoolId ? ' active' : '');
+        btn.dataset.schoolId = s.id;
+        btn.innerHTML = `<span class="drawer-item-icon">${ICONS.school}</span><span class="drawer-item-label">${escapeHtml(s.shortName)}</span><span class="drawer-item-name">${escapeHtml(s.name)}</span>`;
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('schoolchange', { detail: { schoolId: s.id } }));
+        });
+        schoolList.appendChild(btn);
+    }
+
+    // Programs
+    if (programSection && programList) {
+        const showPrograms = state.programs && state.programs.length > 1;
+        programSection.classList.toggle('hidden', !showPrograms);
+        if (showPrograms) {
+            programList.innerHTML = '';
+            for (const p of state.programs) {
+                const btn = document.createElement('button');
+                btn.className = 'drawer-item' + (p.id === state.programId ? ' active' : '');
+                btn.dataset.programId = p.id;
+                btn.innerHTML = `<span class="drawer-item-icon">${ICONS.book}</span><span class="drawer-item-label">${escapeHtml(p.label)}</span>`;
+                btn.addEventListener('click', () => {
+                    window.dispatchEvent(new CustomEvent('programchange', { detail: { programId: p.id } }));
+                });
+                programList.appendChild(btn);
+            }
+        }
+    }
+
+    // Years
+    if (yearList) {
+        yearList.innerHTML = '';
+        for (const y of state.years) {
+            const btn = document.createElement('button');
+            btn.className = 'drawer-item' + (y.id === state.yearId ? ' active' : '');
+            btn.dataset.yearId = y.id;
+            btn.innerHTML = `<span class="drawer-item-icon">${ICONS.calendar}</span><span class="drawer-item-label">${escapeHtml(y.label)}</span>`;
+            btn.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('yearchange', { detail: { yearId: y.id } }));
+            });
+            yearList.appendChild(btn);
+        }
+    }
+
+    // Sections
+    const sectionWrapper = $('#drawer-section-wrapper');
+    if (sectionWrapper && sectionList) {
+        const showSections = state.sections && state.sections.length > 1;
+        sectionWrapper.classList.toggle('hidden', !showSections);
+        if (showSections) {
+            sectionList.innerHTML = '';
+            for (const s of state.sections) {
+                const btn = document.createElement('button');
+                btn.className = 'drawer-item' + (s === state.sectionId ? ' active' : '');
+                btn.dataset.section = s;
+                btn.innerHTML = `<span class="drawer-item-icon">${ICONS.users}</span><span class="drawer-item-label">Section ${s}</span>`;
+                btn.addEventListener('click', () => {
+                    window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
+                });
+                sectionList.appendChild(btn);
+            }
+        }
+    }
+}
+
+export function openDrawer() {
+    const drawer = $('#nav-drawer');
+    const overlay = $('#drawer-overlay');
+    if (!drawer || !overlay) return;
+
+    drawer.classList.add('open');
+    overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+
+    // Focus trap
+    const focusable = drawer.querySelectorAll('button:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) focusable[0].focus();
+
+    drawerFocusTrapCleanup = trapFocus(drawer, () => closeDrawer());
+}
+
+export function closeDrawer() {
+    const drawer = $('#nav-drawer');
+    const overlay = $('#drawer-overlay');
+    if (!drawer || !overlay) return;
+
+    drawer.classList.remove('open');
+    overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+
+    if (drawerFocusTrapCleanup) {
+        drawerFocusTrapCleanup();
+        drawerFocusTrapCleanup = null;
+    }
+
+    // Return focus to hamburger button
+    const hamburger = $('#hamburger-btn');
+    if (hamburger) hamburger.focus();
+}
+
+export function isDrawerOpen() {
+    const drawer = $('#nav-drawer');
+    return drawer ? drawer.classList.contains('open') : false;
+}
+
+function trapFocus(container, onEscape) {
+    function handler(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            onEscape();
+            return;
+        }
+        if (e.key !== 'Tab') return;
+
+        const focusable = container.querySelectorAll(
+            'button:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable.length) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+            if (document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            }
+        } else {
+            if (document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }
+
+    container.addEventListener('keydown', handler);
+    return () => container.removeEventListener('keydown', handler);
+}
+
+// ============================================================
 // Arrow / Home / End keyboard navigation for chip groups.
+// ============================================================
+
 function enableArrowNav(container) {
     container.addEventListener('keydown', (e) => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
@@ -166,11 +436,10 @@ function enableArrowNav(container) {
     });
 }
 
-/**
- * The class to highlight in the timeline for a given day + time.
- * Priority: current class → next class today → first class on a future day.
- * Past days get no highlight (every card reads "done").
- */
+// ============================================================
+// Timeline rendering
+// ============================================================
+
 export function computeHighlight(classes, nowMin, day) {
     const dayClasses = classes.filter((c) => c.day === day).sort(byStart);
     if (day === todayName()) {
@@ -182,8 +451,6 @@ export function computeHighlight(classes, nowMin, day) {
     return { dayClasses, current: null, next };
 }
 
-// Live countdown / progress for the highlighted timeline card. Falls back to
-// nothing when there is no clock context (future days, search, day over).
 export function updateLiveClock(nowMin, current, next) {
     const featured = current || next;
     if (!featured) {
@@ -226,7 +493,6 @@ export function renderTimeline(nowMin, day, ctx, query = '') {
 
     const isToday = day === todayName();
     const dayStatus = isToday ? 'today' : (isBeforeToday(day) ? 'past' : 'future');
-    // Current wins today; a future day's first class stands in as the anchor.
     const highlight = isToday
         ? (ctx.current || ctx.next)
         : (dayStatus === 'future' ? ctx.next : null);
@@ -345,8 +611,10 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
     }
 }
 
-// Shared empty/error card. renderEmpty resets it to the default state so a
-// previous error can never leave stale text behind.
+// ============================================================
+// State cards (empty / error)
+// ============================================================
+
 function hideAll() {
     $('#schedule-section')?.classList.add('hidden');
 }
@@ -378,11 +646,13 @@ export function renderSuccess() {
 }
 
 export function setLastUpdated(date) {
-    $('.last-updated').textContent = `Last updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+    const el = $('.last-updated');
+    if (el) el.textContent = `Last updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export function showToast(message) {
     const toast = $('.toast');
+    if (!toast) return;
     toast.textContent = message;
     toast.classList.add('show');
     clearTimeout(toast._timer);
@@ -393,8 +663,13 @@ export function showToast(message) {
 }
 
 export function setRefreshSpinning(on) {
-    $('#refresh-btn').classList.toggle('spinning', on);
+    const btn = $('#refresh-btn');
+    if (btn) btn.classList.toggle('spinning', on);
 }
+
+// ============================================================
+// Section picker modal (first visit)
+// ============================================================
 
 export function showSectionModal(sections, onSelect) {
     const modal = $('#section-modal');

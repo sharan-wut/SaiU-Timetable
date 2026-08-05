@@ -22,7 +22,6 @@
     <meta name="apple-mobile-web-app-title" content="Timetable">
     <link rel="apple-touch-icon" href="icons/favicon.png">
     <script>
-        // Apply the saved theme before first paint to avoid a flash.
         (function () {
             try {
                 var t = localStorage.getItem('tt-theme');
@@ -32,39 +31,23 @@
                     t = 'dark';
                 }
                 document.documentElement.className = t + '-theme';
-                // Match the browser chrome to the app in both modes, pre-paint.
                 var c = t === 'dark' ? '#111111' : '#ffffff';
                 document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; });
             } catch (e) {}
         })();
     </script>
     <script>
-        // Google Analytics 4 — asynchronous, single-load, DNT-aware.
-        //
-        // The Measurement ID is configured in ONE place: `id` below.
-        // Replace G-XXXXXXXXXX with your real GA4 Measurement ID.
-        // config.js reads it back via window.__TT_GA.id.
         (function () {
             var id = 'G-GYB0SEBGZM';
             window.__TT_GA = { id: id };
-
-            // Never initialize twice (hot-reload / re-execution safety).
             if (window.__TT_GA_READY) return;
-
-            // Respect "Do Not Track": no script, no dataLayer, no events.
             var dnt = navigator.doNotTrack || window.doNotTrack;
             if (dnt === '1' || dnt === 'yes') return;
-
             window.__TT_GA_READY = true;
-
-            // Inject gtag.js asynchronously — never blocks first paint.
             var s = document.createElement('script');
             s.async = true;
             s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
             document.head.appendChild(s);
-
-            // Official dataLayer bootstrap. `gtag('config', id)` fires the
-            // automatic page_view once on load.
             window.dataLayer = window.dataLayer || [];
             window.gtag = function () { window.dataLayer.push(arguments); };
             gtag('js', new Date());
@@ -80,13 +63,18 @@
 
     <header class="app-header glass">
         <div class="header-top">
-            <div class="brand">
-                <h1 id="app-title">Timetable</h1>
-                <p class="date-line">
-                    <span id="header-weekday">—</span>
-                    <span class="date-sep">•</span>
-                    <span id="header-date">—</span>
-                </p>
+            <div class="header-left">
+                <button id="hamburger-btn" class="icon-btn glass hamburger-btn" aria-label="Open navigation menu" title="Menu">
+                    <svg class="lucide" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                </button>
+                <div class="brand">
+                    <h1 id="app-title">Timetable</h1>
+                    <p class="date-line">
+                        <span id="header-weekday">—</span>
+                        <span class="date-sep">•</span>
+                        <span id="header-date">—</span>
+                    </p>
+                </div>
             </div>
             <div class="header-actions">
                 <button id="install-btn" class="icon-btn glass" hidden aria-label="Install app" title="Install app">
@@ -98,6 +86,21 @@
                 <button id="refresh-btn" class="icon-btn glass" aria-label="Refresh timetable" title="Refresh timetable">
                     <svg class="lucide" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                 </button>
+            </div>
+        </div>
+
+        <div class="nav-selectors">
+            <div class="nav-selector-row">
+                <span class="nav-label">School</span>
+                <div id="school-selector" class="nav-selector" aria-label="Select school"></div>
+            </div>
+            <div id="program-selector-wrapper" class="nav-selector-row hidden">
+                <span class="nav-label">Program</span>
+                <div id="program-selector" class="nav-selector" aria-label="Select program"></div>
+            </div>
+            <div class="nav-selector-row">
+                <span class="nav-label">Year</span>
+                <div id="year-selector" class="nav-selector" aria-label="Select year"></div>
             </div>
         </div>
 
@@ -157,6 +160,51 @@
             <div id="section-modal-options" class="section-modal-options"></div>
         </div>
     </div>
+
+    <!-- Mobile navigation drawer -->
+    <div id="drawer-overlay" class="drawer-overlay" aria-hidden="true"></div>
+    <nav id="nav-drawer" class="nav-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
+        <div class="drawer-header">
+            <h2 class="drawer-title">SaiU Timetable</h2>
+            <button class="drawer-close-btn icon-btn" aria-label="Close navigation menu">
+                <svg class="lucide" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="drawer-body">
+            <div class="drawer-section">
+                <h3 class="drawer-section-title">School</h3>
+                <div id="drawer-schools" class="drawer-list" role="radiogroup" aria-label="Select school"></div>
+            </div>
+
+            <div id="drawer-program-section" class="drawer-section hidden">
+                <h3 class="drawer-section-title">Program</h3>
+                <div id="drawer-programs" class="drawer-list" role="radiogroup" aria-label="Select program"></div>
+            </div>
+
+            <div class="drawer-section">
+                <h3 class="drawer-section-title">Year</h3>
+                <div id="drawer-years" class="drawer-list" role="radiogroup" aria-label="Select year"></div>
+            </div>
+
+            <div id="drawer-section-wrapper" class="drawer-section hidden">
+                <h3 class="drawer-section-title">Section</h3>
+                <div id="drawer-sections" class="drawer-list" role="radiogroup" aria-label="Select section"></div>
+            </div>
+
+            <div class="drawer-divider"></div>
+
+            <div class="drawer-section">
+                <h3 class="drawer-section-title">Appearance</h3>
+                <button class="drawer-item drawer-theme-btn" aria-label="Switch theme">
+                    <span class="drawer-item-icon">
+                        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                    </span>
+                    <span class="drawer-item-label">Theme</span>
+                </button>
+            </div>
+        </div>
+    </nav>
 
     <script type="module" src="js/app.js"></script>
 </body>

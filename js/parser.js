@@ -1,14 +1,39 @@
 /**
- * CSV Parser for the grid-style timetable.
- * Cells are labelled "(Sec N)" (e.g. "Linear Algebra (Sec 3)  Tamilarasi").
- * Every section found in the sheet is parsed — no section is hard-coded, so
- * adding a new section later only requires editing the Google Sheet.
+ * CSV Parsers for timetable data.
+ *
+ * Two parser strategies:
+ *   1. `grid` — the original SCDS format (day rows, time columns, (Sec N) labels)
+ *   2. `list` — flat list format: Day, Time, Subject, Faculty, Room, Section
+ *
+ * The parser is selected dynamically per school/year from the config.
  */
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 const SECTION_REGEX = /\(Sec\s*(\d+)\)/i;
 
-export function parseCSV(text) {
+/**
+ * Parse a CSV string into an array of class objects.
+ * @param {string} text - raw CSV content
+ * @param {string} [parserType='grid'] - 'grid' or 'list'
+ * @param {string[]} [trackedCourses] - optional filter list for course names
+ */
+export function parseCSV(text, parserType = 'grid', trackedCourses = null) {
+    const raw = parserType === 'list' ? parseListCSV(text) : parseGridCSV(text);
+    if (!trackedCourses || !trackedCourses.length) return raw;
+
+    // Normalize tracked names for case-insensitive prefix matching.
+    const tracked = trackedCourses.map(c => c.trim().toLowerCase());
+    return raw.filter(c => {
+        const subj = c.subject.trim().toLowerCase();
+        return tracked.some(t => subj === t || subj.startsWith(t) || t.startsWith(subj));
+    });
+}
+
+// ============================================================
+// Grid parser (SCDS format)
+// ============================================================
+
+function parseGridCSV(text) {
     const lines = text.split(/\r?\n/);
     const data = [];
     let currentDay = null;
@@ -30,8 +55,6 @@ export function parseCSV(text) {
         const times = parseTimeRange(timeText);
         if (!times) continue;
 
-        // Parse every cell carrying a section label. A slot can hold one class
-        // per section, so keep scanning the row for other sections.
         for (let j = 2; j < row.length; j++) {
             const cell = row[j];
             if (!cell) continue;
@@ -52,7 +75,7 @@ export function parseCSV(text) {
                 room,
                 section,
                 startTime: times.start,
-                endTime: times.end
+                endTime: times.end,
             });
         }
     }
@@ -63,7 +86,6 @@ function splitCSVLine(line) {
     return line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim());
 }
 
-// The room for a class is in the same column of the following row(s)
 export function findRoom(lines, rowIdx, colIdx) {
     for (let k = rowIdx + 1; k < lines.length; k++) {
         if (!lines[k].trim()) continue;
@@ -77,14 +99,13 @@ export function findRoom(lines, rowIdx, colIdx) {
     return '';
 }
 
-// Parse messy time ranges like "11.15 AM - 12.10 PM", "01.00PM - 01.55PM"
 export function parseTimeRange(text) {
     const normalized = text.replace(/(\d)\.(\d)/g, '$1:$2').replace(/(\d)(AM|PM)/gi, '$1 $2');
     const m = normalized.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
     if (!m) return null;
     return {
         start: to24Hour(m[1], m[2], m[3]),
-        end: to24Hour(m[4], m[5], m[6])
+        end: to24Hour(m[4], m[5], m[6]),
     };
 }
 
@@ -96,7 +117,6 @@ function to24Hour(h, min, meridiem) {
     return `${String(hour).padStart(2, '0')}:${min}`;
 }
 
-// Split "Subject (Sec 3)   Faculty Name" into subject and faculty
 export function splitSubjectFaculty(cell) {
     const parts = cell.split(/\s{2,}/).map(p => p.trim()).filter(Boolean)
         .filter(p => !/^\(Sec\s*\d+\)$/i.test(p));
@@ -107,4 +127,61 @@ export function splitSubjectFaculty(cell) {
         if (m) faculty = m[1].trim();
     }
     return { subject, faculty };
+}
+
+// ============================================================
+// List parser (SOAI / SOB format)
+// Expected columns: Day, Time, Subject, Faculty, Room, [Section]
+// Time column may be a range "09:00-10:00" or "09:00 AM - 10:00 AM".
+// ============================================================
+
+function parseListCSV(text) {
+    const lines = text.split(/\r?\n/);
+    const data = [];
+
+    // Detect header row — skip it if the first column looks like a label.
+    let startIdx = 0;
+    if (lines.length && /^(day|weekday|date)/i.test(lines[0])) startIdx = 1;
+
+    for (let i = startIdx; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const row = splitCSVLine(lines[i]);
+        if (row.length < 4) continue;
+
+        const dayRaw = row[0].trim();
+        const col0Upper = dayRaw.toUpperCase();
+        const dayMatch = DAYS.includes(col0Upper);
+        if (!dayMatch) continue;
+
+        const day = col0Upper.charAt(0) + col0Upper.slice(1).toLowerCase();
+        const timeText = row[1].trim();
+        if (!timeText || /LUNCH|OPEN BLOCK/i.test(timeText)) continue;
+
+        const times = parseTimeRange(timeText);
+        if (!times) continue;
+
+        const subject = (row[2] || '').trim();
+        if (!subject) continue;
+
+        const faculty = (row[3] || '').trim();
+        const room = (row[4] || '').trim();
+
+        // Section is optional — defaults to 1 for single-section schools.
+        let section = 1;
+        if (row[5]) {
+            const n = parseInt(row[5], 10);
+            if (Number.isFinite(n) && n > 0) section = n;
+        }
+
+        data.push({
+            day,
+            subject,
+            faculty,
+            room,
+            section,
+            startTime: times.start,
+            endTime: times.end,
+        });
+    }
+    return data;
 }
