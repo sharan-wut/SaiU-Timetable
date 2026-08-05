@@ -116,7 +116,8 @@ export function initNavigation() {
 }
 
 /**
- * Navigate to a new school. Resets program, year and section to defaults.
+ * Navigate to a new school. Resets program and year to defaults.
+ * Restores the saved section for the target year if available.
  */
 export function navigateToSchool(schoolId) {
     const school = findSchool(schoolId);
@@ -131,7 +132,14 @@ export function navigateToSchool(schoolId) {
     let section = null;
     if (yearConfig) {
         const sections = resolveSections(yearConfig);
-        if (sections.length) section = sections[0];
+        if (sections.length) {
+            const saved = getNavState();
+            if (saved.section && sections.includes(saved.section)) {
+                section = saved.section;
+            } else {
+                section = sections[0];
+            }
+        }
     }
 
     state = { school, program, year: yearConfig, section, yearConfig };
@@ -140,7 +148,8 @@ export function navigateToSchool(schoolId) {
 }
 
 /**
- * Navigate to a new program within the current school. Resets year and section.
+ * Navigate to a new program within the current school. Resets year.
+ * Restores the saved section for the target year if available.
  */
 export function navigateToProgram(programId) {
     const school = state.school;
@@ -153,7 +162,14 @@ export function navigateToProgram(programId) {
     let section = null;
     if (yearConfig) {
         const sections = resolveSections(yearConfig);
-        if (sections.length) section = sections[0];
+        if (sections.length) {
+            const saved = getNavState();
+            if (saved.section && sections.includes(saved.section)) {
+                section = saved.section;
+            } else {
+                section = sections[0];
+            }
+        }
     }
 
     state = { ...state, program, year: yearConfig, section, yearConfig };
@@ -162,7 +178,8 @@ export function navigateToProgram(programId) {
 }
 
 /**
- * Navigate to a new year within the current school/program. Resets section.
+ * Navigate to a new year within the current school/program.
+ * Restores the saved section for the target year if available.
  */
 export function navigateToYear(yearId) {
     const school = state.school;
@@ -174,7 +191,14 @@ export function navigateToYear(yearId) {
 
     let section = null;
     const sections = resolveSections(yearConfig);
-    if (sections.length) section = sections[0];
+    if (sections.length) {
+        const saved = getNavState();
+        if (saved.section && sections.includes(saved.section)) {
+            section = saved.section;
+        } else {
+            section = sections[0];
+        }
+    }
 
     state = { ...state, year: yearConfig, section, yearConfig };
     persist();
