@@ -243,14 +243,36 @@ function initActions() {
     $('#refresh-btn-mobile')?.addEventListener('click', refresh);
     $('.retry-btn')?.addEventListener('click', () => load());
 
-    $('#install-btn')?.addEventListener('click', () => {
-        if (window.deferredPrompt) {
-            window.deferredPrompt.prompt();
-            window.deferredPrompt.userChoice.then(() => { window.deferredPrompt = null; });
+    const handleInstall = async () => {
+        if (deferredPrompt) {
+            console.log('[PWA] Triggering native install prompt');
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('[PWA] User choice:', outcome);
+            if (outcome === 'accepted') {
+                hideInstallButton();
+            }
+            deferredPrompt = null;
+        } else if (isStandalone()) {
+            console.log('[PWA] Already installed');
+            ui.showToast('Already installed');
         } else {
-            ui.showToast('Open the browser menu → "Install app"');
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            if (isIOS) {
+                console.log('[PWA] iOS — no programmatic install, showing share sheet instructions');
+                ui.showToast('Tap Share \u2192 Add to Home Screen');
+            } else if (isAndroid) {
+                console.log('[PWA] Android but no deferredPrompt — showing menu instructions');
+                ui.showToast('Tap browser menu \u2192 Install app');
+            } else {
+                console.log('[PWA] Desktop but no deferredPrompt — showing address bar instructions');
+                ui.showToast('Click the install icon in your address bar');
+            }
         }
-    });
+    };
+    $('#install-btn')?.addEventListener('click', handleInstall);
+    $('#install-btn-mobile')?.addEventListener('click', handleInstall);
 }
 
 // ============================================================
@@ -313,6 +335,8 @@ function initAutoRefresh() {
 // PWA
 // ============================================================
 
+let deferredPrompt = null;
+
 function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
         window.matchMedia('(display-mode: fullscreen)').matches ||
@@ -322,7 +346,8 @@ function isStandalone() {
 }
 
 function showInstallButton() {
-    // Button is always visible now
+    $('#install-btn')?.classList.remove('hidden');
+    $('#install-btn-mobile')?.classList.remove('hidden');
 }
 
 function hideInstallButton() {
@@ -331,17 +356,56 @@ function hideInstallButton() {
 }
 
 function initPWA() {
+    // Register service worker
     if ('serviceWorker' in navigator) {
         const devHost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(location.hostname);
-        if (devHost || !location.protocol.startsWith('https')) {
-            navigator.serviceWorker.getRegistrations().then(r => Promise.all(r.map(x => x.unregister()))).catch(() => {});
+        if (!devHost && location.protocol.startsWith('https')) {
+            navigator.serviceWorker.register('./sw.js')
+                .then((reg) => {
+                    console.log('[PWA] Service Worker registered, scope:', reg.scope);
+                })
+                .catch((err) => {
+                    console.warn('[PWA] Service Worker registration failed:', err);
+                });
         } else {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            console.log('[PWA] Skipping SW registration on dev host');
         }
     }
-    if (isStandalone()) return;
-    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.deferredPrompt = e; });
-    window.addEventListener('appinstalled', () => { window.deferredPrompt = null; trackEvent('pwa_installed'); });
+
+    // Already installed — hide button
+    if (isStandalone()) {
+        console.log('[PWA] Running in standalone mode — already installed');
+        hideInstallButton();
+        return;
+    }
+
+    // Listen for the browser's install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('[PWA] beforeinstallprompt captured — install available');
+        showInstallButton();
+    });
+
+    // App was just installed
+    window.addEventListener('appinstalled', () => {
+        console.log('[PWA] App installed successfully');
+        deferredPrompt = null;
+        hideInstallButton();
+        trackEvent('pwa_installed');
+    });
+
+    // Debug: log if beforeinstallprompt never fires after 5s
+    setTimeout(() => {
+        if (!deferredPrompt && !isStandalone()) {
+            console.warn('[PWA] beforeinstallprompt did not fire within 5s');
+            console.warn('[PWA] Possible reasons:');
+            console.warn('  - Browser does not support programmatic install');
+            console.warn('  - App does not meet installability criteria (HTTPS, manifest, SW)');
+            console.warn('  - User already dismissed the install infobar');
+            console.warn('  - App is already installed');
+        }
+    }, 5000);
 }
 
 // ============================================================
