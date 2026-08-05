@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { parseCSV } from './parser.js';
-import { getTheme as getStoredTheme, setTheme as setStoredTheme, getSection as getStoredSection, setSection as setStoredSection } from './storage.js';
+import { getTheme as getStoredTheme, setTheme as setStoredTheme, getSection as getStoredSection, setSection as setStoredSection, hasSeenSectionModal, markSectionModalSeen } from './storage.js';
 import * as nav from './navigation.js';
 import * as ui from './ui.js';
 import { todayName, nowMinutes, nextSchoolDay, isSchoolDay } from './utils.js';
@@ -16,7 +16,6 @@ let selectedSection = null;
 let lastUpdated = null;
 let selectedDay = null;
 let countdownTimer = null;
-let sectionModalShown = false;
 let lastFeatureKey = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -109,8 +108,8 @@ function syncSections() {
     if (yearSections.length) {
         sections = yearSections;
         if (selectedSection == null) {
-            if (!sectionModalShown) {
-                sectionModalShown = true;
+            if (!hasSeenSectionModal()) {
+                markSectionModalSeen();
                 ui.showSectionModal(sections, (s) => {
                     selectedSection = s;
                     nav.navigateToSection(s);
@@ -439,7 +438,6 @@ function initNavigationListeners() {
     window.addEventListener('schoolchange', (e) => {
         nav.navigateToSchool(e.detail.schoolId);
         selectedSection = null;
-        sectionModalShown = false;
         trackEvent('school_changed', { school: e.detail.schoolId });
         load();
         ui.closeDrawer();
@@ -448,7 +446,6 @@ function initNavigationListeners() {
     window.addEventListener('programchange', (e) => {
         nav.navigateToProgram(e.detail.programId);
         selectedSection = null;
-        sectionModalShown = false;
         trackEvent('program_changed', { program: e.detail.programId });
         load();
         ui.closeDrawer();
@@ -457,7 +454,6 @@ function initNavigationListeners() {
     window.addEventListener('yearchange', (e) => {
         nav.navigateToYear(e.detail.yearId);
         selectedSection = null;
-        sectionModalShown = false;
         trackEvent('year_changed', { year: e.detail.yearId });
         load();
         ui.closeDrawer();

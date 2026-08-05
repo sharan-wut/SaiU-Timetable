@@ -129,3 +129,13 @@ export function setNavState({ schoolId, programId, yearId, section }) {
         else localStorage.setItem(NAV_KEYS.section, String(section));
     }
 }
+
+// --- Section modal seen flag ---
+
+export function hasSeenSectionModal() {
+    return localStorage.getItem('tt-section-modal-seen') === '1';
+}
+
+export function markSectionModalSeen() {
+    localStorage.setItem('tt-section-modal-seen', '1');
+}

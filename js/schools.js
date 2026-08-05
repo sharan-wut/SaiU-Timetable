@@ -46,16 +46,14 @@ export const SCHOOLS = [
                 id: 'soai-2',
                 label: 'Year 2',
                 sections: null,
-                sheetId: '',
+                sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
                 gid: '0',
-                parser: 'list',
+                parser: 'grid',
                 trackedCourses: [
                     'Differential Equations',
                     'Frontiers of Machine Learning',
                     'Discrete Mathematics',
-                    'Human-AI Interaction',
-                    'Image Processing',
-                    'Intelligent Embedded Systems',
+                    'Human AI Interaction',
                 ],
             },
         ],
@@ -71,7 +69,7 @@ export const SCHOOLS = [
                 years: [
                     {
                         id: 'sob-bba-2',
-                        label: '2nd Year',
+                        label: 'Year 2',
                         sections: null,
                         sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
                         gid: '0',
