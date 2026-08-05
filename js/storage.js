@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 
 /**
- * localStorage persistence: timetable cache, room-change map, theme,
+ * localStorage persistence: timetable cache, room-change map,
  * and navigation state (school, program, year, section).
  */
 
@@ -9,24 +9,16 @@ function read(key) {
     try {
         const raw = localStorage.getItem(key);
         return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
+    } catch { return null; }
 }
 
 function write(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-        // storage full / private mode — non-fatal
-    }
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* full */ }
 }
 
 // --- Timetable cache ---
 
-export function getCachedTimetable() {
-    return read(CONFIG.CACHE_KEY);
-}
+export function getCachedTimetable() { return read(CONFIG.CACHE_KEY); }
 
 export function setCachedTimetable(data) {
     write(CONFIG.CACHE_KEY, { savedAt: Date.now(), classes: data });
@@ -34,9 +26,7 @@ export function setCachedTimetable(data) {
 
 // --- Room-change detection ---
 
-export function getRoomMap() {
-    return read(CONFIG.ROOMS_KEY) || {};
-}
+export function getRoomMap() { return read(CONFIG.ROOMS_KEY) || {}; }
 
 const PLACEHOLDER_ROOMS = /^(tba|tbd|to be announced|to be decided|room tba|n\/?a)$/i;
 
@@ -56,18 +46,14 @@ export function updateRoomMap(classes) {
         const room = normalizeRoom(rawRoom);
         const prevRaw = String(map[key] ?? '').trim();
         const prev = normalizeRoom(prevRaw);
-        if (room && prev && prev !== room) {
-            c.roomChanged = true;
-            c.originalRoom = prevRaw;
-            changed = true;
-        }
+        if (room && prev && prev !== room) { c.roomChanged = true; c.originalRoom = prevRaw; changed = true; }
         if (room) map[key] = rawRoom;
     }
     write(CONFIG.ROOMS_KEY, map);
     return changed;
 }
 
-// --- Section selection (legacy, kept for backward compat) ---
+// --- Section selection (legacy) ---
 
 export function getSection() {
     const raw = localStorage.getItem(CONFIG.SECTION_KEY);
@@ -77,16 +63,6 @@ export function getSection() {
 
 export function setSection(section) {
     localStorage.setItem(CONFIG.SECTION_KEY, String(section));
-}
-
-// --- Theme ---
-
-export function getTheme() {
-    return localStorage.getItem('tt-theme') || 'dark';
-}
-
-export function setTheme(theme) {
-    localStorage.setItem('tt-theme', theme);
 }
 
 // --- Navigation state persistence ---

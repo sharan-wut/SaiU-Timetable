@@ -2,24 +2,17 @@ import { CONFIG } from './config.js';
 import { toMinutes, minutesToLabel, minutesToClock, todayName, isBeforeToday, WEEKDAYS } from './utils.js';
 
 /**
- * DOM rendering — pure functions over the classes array.
- *
- * Page hierarchy (one continuous schedule, no duplicated classes):
- *   Today's Schedule   → the full timeline for the selected day; the current /
- *                        next class is highlighted inline with a countdown
+ * DOM rendering — sidebar filters + timeline.
  */
 
 const $ = (sel) => document.querySelector(sel);
+function $$(sel) { return [...document.querySelectorAll(sel)]; }
 
 function svg(inner, size = 20) {
-    return `<svg class="lucide" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }
 
-// Lucide-style stroke icon set (consistent weight, no emoji).
 const ICONS = {
-    sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),
-    moon: svg('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),
-    monitor: svg('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'),
     mapPin: svg('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>', 15),
     clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', 15),
     alertTriangle: svg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', 13),
@@ -27,16 +20,7 @@ const ICONS = {
     circleAlert: svg('<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>', 40),
     checkCircle: svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>', 40),
     coffee: svg('<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/>', 14),
-    menu: svg('<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>', 22),
-    chevronRight: svg('<path d="m9 18 6-6-6-6"/>', 16),
-    x: svg('<path d="M18 6 6 18M6 6l12 12"/>', 20),
-    school: svg('<path d="M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 2 6 2s6-.9 6-2v-5"/>', 18),
-    book: svg('<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>', 18),
-    calendar: svg('<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>', 18),
-    users: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', 18),
 };
-
-const THEME_CYCLE = { dark: 'light', light: 'system', system: 'dark' };
 
 function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -48,392 +32,176 @@ function byStart(a, b) {
     return toMinutes(a.startTime) - toMinutes(b.startTime);
 }
 
-export function setThemeIcon(preference) {
-    const btns = $$('.drawer-theme-btn, #theme-btn');
-    for (const btn of btns) {
-        btn.innerHTML = ICONS[preference] || ICONS.moon;
-        const next = THEME_CYCLE[preference] || 'light';
-        const label = `Switch to ${next} theme`;
-        btn.setAttribute('aria-label', label);
-        btn.setAttribute('title', label);
+// ============================================================
+// Sidebar rendering
+// ============================================================
+
+export function renderSidebar(state) {
+    renderSidebarList('sidebar-schools', state.schools, state.schoolId, 'schoolId', 'schoolchange', 'schoolId');
+    renderSidebarList('sidebar-programs', state.programs, state.programId, 'programId', 'programchange', 'programId');
+
+    const programSection = $('#sidebar-program-section');
+    if (programSection) {
+        const show = state.programs && state.programs.length > 1;
+        programSection.classList.toggle('hidden', !show);
+    }
+
+    renderSidebarList('sidebar-years', state.years, state.yearId, 'yearId', 'yearchange', 'yearId');
+
+    const sectionWrapper = $('#sidebar-section-wrapper');
+    if (sectionWrapper) {
+        const show = state.sections && state.sections.length > 1;
+        sectionWrapper.classList.toggle('hidden', !show);
+        if (show) {
+            renderSidebarSectionList('sidebar-sections', state.sections, state.sectionId);
+        }
     }
 }
 
-function $$(sel) {
-    return [...document.querySelectorAll(sel)];
+function renderSidebarList(containerId, items, selectedId, dataKey, eventName, stateKey) {
+    const container = $(`#${containerId}`);
+    if (!container) return;
+
+    const sig = items.map(i => i.id || i).join(',');
+    if (container.dataset.sig === sig) {
+        for (const btn of container.children) {
+            const id = btn.dataset[stateKey] ?? btn.dataset.section;
+            btn.classList.toggle('active', id == selectedId);
+        }
+        return;
+    }
+
+    container.innerHTML = '';
+    container.dataset.sig = sig;
+    for (const item of items) {
+        const id = item.id ?? item;
+        const label = item.shortName || item.label || item;
+        const sub = item.name || null;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sidebar-item' + (id == selectedId ? ' active' : '');
+        btn.dataset[dataKey] = id;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', id == selectedId ? 'true' : 'false');
+        btn.setAttribute('aria-label', sub || String(label));
+        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">${escapeHtml(String(label))}</span>${sub ? `<span class="sidebar-item-sub">${escapeHtml(sub)}</span>` : ''}`;
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent(eventName, { detail: { [dataKey]: id } }));
+        });
+        container.appendChild(btn);
+    }
 }
 
-// ============================================================
-// Loading / empty states
-// ============================================================
+function renderSidebarSectionList(containerId, sections, selectedId) {
+    const container = $(`#${containerId}`);
+    if (!container) return;
 
-export function showLoading() {
-    const el = $('#loading-state');
-    if (!el) return;
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => el.classList.add('visible'), 150);
+    const sorted = [...new Set(sections)].sort((a, b) => a - b);
+    const sig = sorted.join(',');
+    if (container.dataset.sig === sig) {
+        for (const btn of container.children) {
+            const s = Number(btn.dataset.section);
+            btn.classList.toggle('active', s === selectedId);
+            btn.setAttribute('aria-checked', s === selectedId ? 'true' : 'false');
+        }
+        return;
+    }
+
+    container.innerHTML = '';
+    container.dataset.sig = sig;
+    for (const s of sorted) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sidebar-item' + (s === selectedId ? ' active' : '');
+        btn.dataset.section = s;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', s === selectedId ? 'true' : 'false');
+        btn.setAttribute('aria-label', `Section ${s}`);
+        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">Section ${s}</span>`;
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
+        });
+        container.appendChild(btn);
+    }
 }
-
-export function hideLoading() {
-    const el = $('#loading-state');
-    if (!el) return;
-    clearTimeout(el._timer);
-    el.classList.remove('visible');
-}
-
-export function renderDateLine() {
-    const d = new Date();
-    const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
-    const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    const el = $('.date-line');
-    if (el) el.innerHTML = `<strong>${weekday}</strong><span class="date-sep">·</span>${date}`;
-}
-
-// ============================================================
-// Day filter chips
-// ============================================================
 
 export function renderDayFilter(selectedDay) {
-    const container = $('.day-filter');
+    const container = $('#sidebar-days');
     if (!container) return;
     if (!container.children.length) {
         for (const day of WEEKDAYS) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'day-chip';
+            btn.className = 'sidebar-day-btn';
             btn.dataset.day = day;
             btn.textContent = day.slice(0, 3);
-            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('role', 'radio');
+            btn.setAttribute('aria-checked', 'false');
             btn.setAttribute('aria-label', day);
-            if (day === todayName()) btn.classList.add('today');
             btn.addEventListener('click', () => {
                 window.dispatchEvent(new CustomEvent('daychange', { detail: { day } }));
             });
             container.appendChild(btn);
         }
-        enableArrowNav(container);
     }
     for (const btn of container.children) {
         const active = btn.dataset.day === selectedDay;
         btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    scrollChipIntoView(container, container.querySelector('.day-chip.active'), 'activeDay', selectedDay);
-}
-
-function scrollChipIntoView(container, chip, attr, value) {
-    if (!chip || container.dataset[attr] === String(value)) return;
-    container.dataset[attr] = String(value);
-    if (container.scrollWidth <= container.clientWidth + 1) return;
-    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    chip.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
-}
-
-// ============================================================
-// Section selector chips
-// ============================================================
-
-export function renderSectionSelector(sections, selectedSection) {
-    const container = $('#section-selector');
-    if (!container) return;
-    const sorted = [...new Set(sections)].sort((a, b) => a - b);
-    const sig = sorted.join(',');
-    if (container.dataset.sig !== sig) {
-        container.innerHTML = '';
-        container.dataset.sig = sig;
-        for (const s of sorted) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'section-chip';
-            btn.dataset.section = s;
-            btn.textContent = s;
-            btn.setAttribute('aria-pressed', 'false');
-            btn.setAttribute('aria-label', `Section ${s}`);
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
-            });
-            container.appendChild(btn);
-        }
-        enableArrowNav(container);
-    }
-    for (const btn of container.children) {
-        const active = Number(btn.dataset.section) === selectedSection;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    scrollChipIntoView(container, container.querySelector('.section-chip.active'), 'activeSection', selectedSection);
-}
-
-// ============================================================
-// Navigation selectors (school / program / year) — desktop chips
-// ============================================================
-
-export function renderSchoolSelector(schools, selectedId) {
-    const container = $('#school-selector');
-    if (!container) return;
-    const sig = schools.map(s => s.id).join(',');
-    if (container.dataset.sig !== sig) {
-        container.innerHTML = '';
-        container.dataset.sig = sig;
-        for (const s of schools) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'nav-chip';
-            btn.dataset.schoolId = s.id;
-            btn.textContent = s.shortName;
-            btn.setAttribute('aria-pressed', 'false');
-            btn.setAttribute('aria-label', s.name);
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('schoolchange', { detail: { schoolId: s.id } }));
-            });
-            container.appendChild(btn);
-        }
-        enableArrowNav(container);
-    }
-    for (const btn of container.children) {
-        const active = btn.dataset.schoolId === selectedId;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-}
-
-export function renderProgramSelector(programs, selectedId, visible) {
-    const wrapper = $('#program-selector-wrapper');
-    const container = $('#program-selector');
-    if (!wrapper || !container) return;
-    wrapper.classList.toggle('hidden', !visible);
-    if (!visible) return;
-
-    const sig = programs.map(p => p.id).join(',');
-    if (container.dataset.sig !== sig) {
-        container.innerHTML = '';
-        container.dataset.sig = sig;
-        for (const p of programs) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'nav-chip';
-            btn.dataset.programId = p.id;
-            btn.textContent = p.label;
-            btn.setAttribute('aria-pressed', 'false');
-            btn.setAttribute('aria-label', p.label);
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('programchange', { detail: { programId: p.id } }));
-            });
-            container.appendChild(btn);
-        }
-        enableArrowNav(container);
-    }
-    for (const btn of container.children) {
-        const active = btn.dataset.programId === selectedId;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-}
-
-export function renderYearSelector(years, selectedId) {
-    const container = $('#year-selector');
-    if (!container) return;
-    const sig = years.map(y => y.id).join(',');
-    if (container.dataset.sig !== sig) {
-        container.innerHTML = '';
-        container.dataset.sig = sig;
-        for (const y of years) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'nav-chip';
-            btn.dataset.yearId = y.id;
-            btn.textContent = y.label;
-            btn.setAttribute('aria-pressed', 'false');
-            btn.setAttribute('aria-label', y.label);
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('yearchange', { detail: { yearId: y.id } }));
-            });
-            container.appendChild(btn);
-        }
-        enableArrowNav(container);
-    }
-    for (const btn of container.children) {
-        const active = btn.dataset.yearId === selectedId;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        btn.setAttribute('aria-checked', active ? 'true' : 'false');
     }
 }
 
 // ============================================================
-// Navigation drawer (mobile)
+// Mobile drawer
 // ============================================================
 
 let drawerFocusTrapCleanup = null;
 
-export function renderDrawer(state) {
-    const schoolList = $('#drawer-schools');
-    const programSection = $('#drawer-program-section');
-    const programList = $('#drawer-programs');
-    const yearList = $('#drawer-years');
-    const sectionList = $('#drawer-sections');
-
-    if (!schoolList) return;
-
-    // Schools
-    schoolList.innerHTML = '';
-    for (const s of state.schools) {
-        const btn = document.createElement('button');
-        btn.className = 'drawer-item' + (s.id === state.schoolId ? ' active' : '');
-        btn.dataset.schoolId = s.id;
-        btn.innerHTML = `<span class="drawer-item-icon">${ICONS.school}</span><span class="drawer-item-label">${escapeHtml(s.shortName)}</span><span class="drawer-item-name">${escapeHtml(s.name)}</span>`;
-        btn.addEventListener('click', () => {
-            window.dispatchEvent(new CustomEvent('schoolchange', { detail: { schoolId: s.id } }));
-        });
-        schoolList.appendChild(btn);
-    }
-
-    // Programs
-    if (programSection && programList) {
-        const showPrograms = state.programs && state.programs.length > 1;
-        programSection.classList.toggle('hidden', !showPrograms);
-        if (showPrograms) {
-            programList.innerHTML = '';
-            for (const p of state.programs) {
-                const btn = document.createElement('button');
-                btn.className = 'drawer-item' + (p.id === state.programId ? ' active' : '');
-                btn.dataset.programId = p.id;
-                btn.innerHTML = `<span class="drawer-item-icon">${ICONS.book}</span><span class="drawer-item-label">${escapeHtml(p.label)}</span>`;
-                btn.addEventListener('click', () => {
-                    window.dispatchEvent(new CustomEvent('programchange', { detail: { programId: p.id } }));
-                });
-                programList.appendChild(btn);
-            }
-        }
-    }
-
-    // Years
-    if (yearList) {
-        yearList.innerHTML = '';
-        for (const y of state.years) {
-            const btn = document.createElement('button');
-            btn.className = 'drawer-item' + (y.id === state.yearId ? ' active' : '');
-            btn.dataset.yearId = y.id;
-            btn.innerHTML = `<span class="drawer-item-icon">${ICONS.calendar}</span><span class="drawer-item-label">${escapeHtml(y.label)}</span>`;
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('yearchange', { detail: { yearId: y.id } }));
-            });
-            yearList.appendChild(btn);
-        }
-    }
-
-    // Sections
-    const sectionWrapper = $('#drawer-section-wrapper');
-    if (sectionWrapper && sectionList) {
-        const showSections = state.sections && state.sections.length > 1;
-        sectionWrapper.classList.toggle('hidden', !showSections);
-        if (showSections) {
-            sectionList.innerHTML = '';
-            for (const s of state.sections) {
-                const btn = document.createElement('button');
-                btn.className = 'drawer-item' + (s === state.sectionId ? ' active' : '');
-                btn.dataset.section = s;
-                btn.innerHTML = `<span class="drawer-item-icon">${ICONS.users}</span><span class="drawer-item-label">Section ${s}</span>`;
-                btn.addEventListener('click', () => {
-                    window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
-                });
-                sectionList.appendChild(btn);
-            }
-        }
-    }
-}
-
 export function openDrawer() {
-    const drawer = $('#nav-drawer');
+    const sidebar = $('#sidebar');
     const overlay = $('#drawer-overlay');
-    if (!drawer || !overlay) return;
-
-    drawer.classList.add('open');
+    if (!sidebar || !overlay) return;
+    sidebar.classList.add('open');
     overlay.classList.add('visible');
     document.body.style.overflow = 'hidden';
-
-    // Focus trap
-    const focusable = drawer.querySelectorAll('button:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])');
+    const focusable = sidebar.querySelectorAll('button:not([hidden]):not([disabled])');
     if (focusable.length) focusable[0].focus();
-
-    drawerFocusTrapCleanup = trapFocus(drawer, () => closeDrawer());
+    drawerFocusTrapCleanup = trapFocus(sidebar, () => closeDrawer());
 }
 
 export function closeDrawer() {
-    const drawer = $('#nav-drawer');
+    const sidebar = $('#sidebar');
     const overlay = $('#drawer-overlay');
-    if (!drawer || !overlay) return;
-
-    drawer.classList.remove('open');
+    if (!sidebar || !overlay) return;
+    sidebar.classList.remove('open');
     overlay.classList.remove('visible');
     document.body.style.overflow = '';
-
-    if (drawerFocusTrapCleanup) {
-        drawerFocusTrapCleanup();
-        drawerFocusTrapCleanup = null;
-    }
-
-    // Return focus to hamburger button
+    if (drawerFocusTrapCleanup) { drawerFocusTrapCleanup(); drawerFocusTrapCleanup = null; }
     const hamburger = $('#hamburger-btn');
     if (hamburger) hamburger.focus();
 }
 
 export function isDrawerOpen() {
-    const drawer = $('#nav-drawer');
-    return drawer ? drawer.classList.contains('open') : false;
+    const sidebar = $('#sidebar');
+    return sidebar ? sidebar.classList.contains('open') : false;
 }
 
 function trapFocus(container, onEscape) {
     function handler(e) {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            onEscape();
-            return;
-        }
+        if (e.key === 'Escape') { e.preventDefault(); onEscape(); return; }
         if (e.key !== 'Tab') return;
-
-        const focusable = container.querySelectorAll(
-            'button:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
+        const focusable = container.querySelectorAll('button:not([hidden]):not([disabled])');
         if (!focusable.length) return;
-
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
-
         if (e.shiftKey) {
-            if (document.activeElement === first) {
-                e.preventDefault();
-                last.focus();
-            }
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
         } else {
-            if (document.activeElement === last) {
-                e.preventDefault();
-                first.focus();
-            }
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
         }
     }
-
     container.addEventListener('keydown', handler);
     return () => container.removeEventListener('keydown', handler);
-}
-
-// ============================================================
-// Arrow / Home / End keyboard navigation for chip groups.
-// ============================================================
-
-function enableArrowNav(container) {
-    container.addEventListener('keydown', (e) => {
-        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-        const buttons = [...container.querySelectorAll('button')];
-        const idx = buttons.indexOf(document.activeElement);
-        if (idx === -1) return;
-        e.preventDefault();
-        let next;
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = buttons[(idx + 1) % buttons.length];
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = buttons[(idx - 1 + buttons.length) % buttons.length];
-        else if (e.key === 'Home') next = buttons[0];
-        else if (e.key === 'End') next = buttons[buttons.length - 1];
-        if (next) next.focus();
-    });
 }
 
 // ============================================================
@@ -490,12 +258,9 @@ export function renderTimeline(nowMin, day, ctx, query = '') {
 
     const today = ctx.dayClasses;
     const q = query.trim().toLowerCase();
-
     const isToday = day === todayName();
     const dayStatus = isToday ? 'today' : (isBeforeToday(day) ? 'past' : 'future');
-    const highlight = isToday
-        ? (ctx.current || ctx.next)
-        : (dayStatus === 'future' ? ctx.next : null);
+    const highlight = isToday ? (ctx.current || ctx.next) : (dayStatus === 'future' ? ctx.next : null);
 
     $('#timeline-title').textContent = isToday ? "Today's Schedule" : `${day}'s Schedule`;
     section.classList.remove('hidden');
@@ -549,11 +314,9 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
     for (const c of items) {
         const startMin = toMinutes(c.startTime);
         const endMin = toMinutes(c.endTime);
-        const status = dayStatus === 'past'
-            ? 'completed'
-            : dayStatus === 'future'
-                ? 'upcoming'
-                : (endMin <= nowMin ? 'completed' : (startMin <= nowMin ? 'current' : 'upcoming'));
+        const status = dayStatus === 'past' ? 'completed'
+            : dayStatus === 'future' ? 'upcoming'
+            : (endMin <= nowMin ? 'completed' : (startMin <= nowMin ? 'current' : 'upcoming'));
         const hl = c === highlight;
 
         if (!skipBreaks && prevEnd !== null && startMin - prevEnd >= CONFIG.BREAK_THRESHOLD_MIN) {
@@ -599,8 +362,7 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
                     <span class="status-badge ${badge.cls}">${badge.label}</span>
                 </div>
                 ${c.roomChanged ? `<span class="room-change-badge">${ICONS.alertTriangle}<span>${c.originalRoom ? `Room changed · ${escapeHtml(c.originalRoom)} → ${escapeHtml(c.room)}` : 'Room changed'}</span></span>` : ''}
-                ${live}
-                ${progress}
+                ${live}${progress}
                 <div class="tl-time-row">
                     <span>${minutesToClock(startMin)} – ${minutesToClock(endMin)}</span>
                     <span class="tl-duration">${minutesToLabel(endMin - startMin)}</span>
@@ -612,42 +374,58 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
 }
 
 // ============================================================
-// State cards (empty / error)
+// State cards
 // ============================================================
 
-function hideAll() {
-    $('#schedule-section')?.classList.add('hidden');
-}
+function hideAll() { $('#schedule-section')?.classList.add('hidden'); }
 
 export function renderEmpty() {
-    hideLoading();
-    hideAll();
-    $('.state-card').classList.remove('hidden');
+    hideLoading(); hideAll();
+    $('.state-card')?.classList.remove('hidden');
     $('#empty-icon').innerHTML = ICONS.calendarX;
     $('#state-title').textContent = 'No classes found';
     $('#state-message').textContent = 'There are no classes scheduled for this day.';
-    $('.retry-btn').classList.add('hidden');
+    $('.retry-btn')?.classList.add('hidden');
 }
 
 export function renderError() {
-    hideLoading();
-    hideAll();
-    $('.state-card').classList.remove('hidden');
+    hideLoading(); hideAll();
+    $('.state-card')?.classList.remove('hidden');
     $('#empty-icon').innerHTML = ICONS.circleAlert;
     $('#state-title').textContent = "Couldn't load the timetable";
     $('#state-message').textContent = 'Check your connection and try again. Your last known schedule is still cached offline.';
-    $('.retry-btn').classList.remove('hidden');
+    $('.retry-btn')?.classList.remove('hidden');
 }
 
 export function renderSuccess() {
     hideLoading();
-    $('.state-card').classList.add('hidden');
-    $('.retry-btn').classList.add('hidden');
+    $('.state-card')?.classList.add('hidden');
+    $('.retry-btn')?.classList.add('hidden');
 }
 
+// ============================================================
+// Loading
+// ============================================================
+
+export function showLoading() {
+    const el = $('#loading-state');
+    if (!el) return;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.add('visible'), 150);
+}
+
+export function hideLoading() {
+    const el = $('#loading-state');
+    if (!el) return;
+    clearTimeout(el._timer);
+    el.classList.remove('visible');
+}
+
+export function renderDateLine() {}
+
 export function setLastUpdated(date) {
-    const el = $('.last-updated');
-    if (el) el.textContent = `Last updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+    const el = $('#last-updated');
+    if (el) el.textContent = `Updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export function showToast(message) {
@@ -656,19 +434,16 @@ export function showToast(message) {
     toast.textContent = message;
     toast.classList.add('show');
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => {
-        toast.classList.remove('show');
-        toast.textContent = '';
-    }, 3000);
+    toast._timer = setTimeout(() => { toast.classList.remove('show'); toast.textContent = ''; }, 3000);
 }
 
 export function setRefreshSpinning(on) {
-    const btn = $('#refresh-btn');
-    if (btn) btn.classList.toggle('spinning', on);
+    $('#refresh-btn')?.classList.toggle('spinning', on);
+    $('#refresh-btn-mobile')?.classList.toggle('spinning', on);
 }
 
 // ============================================================
-// Section picker modal (first visit)
+// Section modal
 // ============================================================
 
 export function showSectionModal(sections, onSelect) {
@@ -681,17 +456,13 @@ export function showSectionModal(sections, onSelect) {
         const btn = document.createElement('button');
         btn.className = 'section-option';
         btn.textContent = `Section ${s}`;
-        btn.addEventListener('click', () => {
-            hideSectionModal();
-            onSelect(s);
-        });
+        btn.addEventListener('click', () => { hideSectionModal(); onSelect(s); });
         options.appendChild(btn);
     }
     modal.classList.remove('hidden');
     requestAnimationFrame(() => {
         modal.classList.add('show');
-        const first = options.querySelector('button');
-        if (first) first.focus();
+        options.querySelector('button')?.focus();
     });
 }
 
