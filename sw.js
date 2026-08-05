@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timetable-v9';
+const CACHE_NAME = 'timetable-v12';
 const ASSETS = [
   'index.html',
   'style.css',
@@ -7,6 +7,8 @@ const ASSETS = [
   'js/parser.js',
   'js/utils.js',
   'js/storage.js',
+  'js/schools.js',
+  'js/navigation.js',
   'js/ui.js',
   'js/app.js',
   'icons/favicon-32.png',

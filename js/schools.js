@@ -1,0 +1,136 @@
+/**
+ * Multi-school configuration.
+ *
+ * Each school defines its hierarchy: school → program (optional) → year →
+ * section (optional) → timetable source. The UI reads this tree and
+ * automatically renders the correct selectors — no hardcoded UI changes
+ * are needed when a new school is added.
+ *
+ * Adding a school = editing this file. No UI code changes required.
+ */
+
+export const SCHOOLS = [
+    {
+        id: 'scds',
+        shortName: 'SCDS',
+        programs: null,
+        years: [
+            {
+                id: 'scds-2',
+                label: 'Year 2',
+                sections: [1, 2, 3, 4, 5, 6, 7],
+                sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
+                gid: '0',
+                parser: 'grid',
+                trackedCourses: null,
+            },
+        ],
+    },
+    {
+        id: 'soai',
+        shortName: 'SOAI',
+        programs: null,
+        years: [
+            {
+                id: 'soai-2',
+                label: 'Year 2',
+                sections: null,
+                sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
+                gid: '0',
+                parser: 'grid',
+                trackedCourses: [
+                    'Differential Equations',
+                    'Frontiers of Machine Learning',
+                    'Discrete Mathematics',
+                    'Human AI Interaction',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'sob',
+        shortName: 'SOB',
+        programs: [
+            {
+                id: 'bba',
+                label: 'BBA',
+                years: [
+                    {
+                        id: 'sob-bba-2',
+                        label: 'Year 2',
+                        sections: null,
+                        sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
+                        gid: '0',
+                        parser: 'grid',
+                        trackedCourses: [
+                            'Corporate and Business Law',
+                            'Operations Research',
+                            'Human Resource Management',
+                            'Principles in Financial Management',
+                        ],
+                    },
+                ],
+            },
+        ],
+        years: null,
+    },
+];
+
+/**
+ * Flatten the school tree into a lookup map keyed by year config id.
+ * Used by the app to resolve the active timetable source quickly.
+ */
+export function buildYearMap(schools = SCHOOLS) {
+    const map = new Map();
+    for (const school of schools) {
+        if (school.programs) {
+            for (const program of school.programs) {
+                for (const year of program.years) {
+                    map.set(year.id, { school, program, year });
+                }
+            }
+        }
+        if (school.years) {
+            for (const year of school.years) {
+                map.set(year.id, { school, program: null, year });
+            }
+        }
+    }
+    return map;
+}
+
+/**
+ * Resolve the list of years for a given school and optional program.
+ */
+export function resolveYears(school, programId) {
+    if (school.programs && programId) {
+        const program = school.programs.find(p => p.id === programId);
+        return program ? program.years : [];
+    }
+    return school.years || [];
+}
+
+/**
+ * Resolve the list of sections for a given year config.
+ * Returns [] if sections is null (no sections needed).
+ */
+export function resolveSections(yearConfig) {
+    return yearConfig.sections || [];
+}
+
+/**
+ * Determine whether the program selector should be shown.
+ * Hidden when a school has only one program (or none).
+ */
+export function shouldShowProgram(school) {
+    return school.programs && school.programs.length > 1;
+}
+
+/**
+ * Determine whether the section selector should be shown.
+ * Hidden when a year has no sections or exactly one section.
+ */
+export function shouldShowSection(yearConfig) {
+    const sections = resolveSections(yearConfig);
+    return sections.length > 1;
+}

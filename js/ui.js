@@ -2,24 +2,17 @@ import { CONFIG } from './config.js';
 import { toMinutes, minutesToLabel, minutesToClock, todayName, isBeforeToday, WEEKDAYS } from './utils.js';
 
 /**
- * DOM rendering — pure functions over the classes array.
- *
- * Page hierarchy (one continuous schedule, no duplicated classes):
- *   Today's Schedule   → the full timeline for the selected day; the current /
- *                        next class is highlighted inline with a countdown
+ * DOM rendering — sidebar filters + timeline.
  */
 
 const $ = (sel) => document.querySelector(sel);
+function $$(sel) { return [...document.querySelectorAll(sel)]; }
 
 function svg(inner, size = 20) {
-    return `<svg class="lucide" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }
 
-// Lucide-style stroke icon set (consistent weight, no emoji).
 const ICONS = {
-    sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),
-    moon: svg('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),
-    monitor: svg('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'),
     mapPin: svg('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>', 15),
     clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', 15),
     alertTriangle: svg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', 13),
@@ -28,8 +21,6 @@ const ICONS = {
     checkCircle: svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>', 40),
     coffee: svg('<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/>', 14),
 };
-
-const THEME_CYCLE = { dark: 'light', light: 'system', system: 'dark' };
 
 function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -41,136 +32,189 @@ function byStart(a, b) {
     return toMinutes(a.startTime) - toMinutes(b.startTime);
 }
 
-export function setThemeIcon(preference) {
-    const btn = $('#theme-btn');
-    if (!btn) return;
-    btn.innerHTML = ICONS[preference] || ICONS.moon;
-    const next = THEME_CYCLE[preference] || 'light';
-    const label = `Switch to ${next} theme`;
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', label);
+// ============================================================
+// Sidebar rendering
+// ============================================================
+
+export function renderSidebar(state) {
+    renderSidebarList('sidebar-schools', state.schools, state.schoolId, 'schoolId', 'schoolchange', 'schoolId');
+    renderSidebarList('sidebar-programs', state.programs, state.programId, 'programId', 'programchange', 'programId');
+
+    const programSection = $('#sidebar-program-section');
+    if (programSection) {
+        const show = state.programs && state.programs.length > 1;
+        programSection.classList.toggle('hidden', !show);
+    }
+
+    const yearSection = $('#sidebar-years')?.closest('.sidebar-section');
+    if (yearSection) {
+        const singleYear = state.years && state.years.length <= 1;
+        yearSection.classList.toggle('hidden', singleYear);
+        if (!singleYear) {
+            renderSidebarList('sidebar-years', state.years, state.yearId, 'yearId', 'yearchange', 'yearId');
+        }
+    }
+
+    const sectionWrapper = $('#sidebar-section-wrapper');
+    if (sectionWrapper) {
+        const show = state.sections && state.sections.length > 1;
+        sectionWrapper.classList.toggle('hidden', !show);
+        if (show) {
+            renderSidebarSectionList('sidebar-sections', state.sections, state.sectionId);
+        }
+    }
 }
 
-// Real loading indicator: shown only while a fetch is in flight and there is
-// no cached data to paint immediately. A 150ms display gate prevents a flash
-// when the fetch resolves quickly.
-export function showLoading() {
-    const el = $('#loading-state');
-    if (!el) return;
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => el.classList.add('visible'), 150);
+function renderSidebarList(containerId, items, selectedId, dataKey, eventName, stateKey) {
+    const container = $(`#${containerId}`);
+    if (!container) return;
+
+    const sig = items.map(i => i.id || i).join(',');
+    if (container.dataset.sig === sig) {
+        for (const btn of container.children) {
+            const id = btn.dataset[stateKey] ?? btn.dataset.section;
+            btn.classList.toggle('active', id == selectedId);
+        }
+        return;
+    }
+
+    container.innerHTML = '';
+    container.dataset.sig = sig;
+    for (const item of items) {
+        const id = item.id ?? item;
+        const label = item.shortName || item.label || item;
+        const sub = item.name || null;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sidebar-item' + (id == selectedId ? ' active' : '');
+        btn.dataset[dataKey] = id;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', id == selectedId ? 'true' : 'false');
+        btn.setAttribute('aria-label', sub || String(label));
+        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">${escapeHtml(String(label))}</span>${sub ? `<span class="sidebar-item-sub">${escapeHtml(sub)}</span>` : ''}`;
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent(eventName, { detail: { [dataKey]: id } }));
+        });
+        container.appendChild(btn);
+    }
 }
 
-export function hideLoading() {
-    const el = $('#loading-state');
-    if (!el) return;
-    clearTimeout(el._timer);
-    el.classList.remove('visible');
+function renderSidebarSectionList(containerId, sections, selectedId) {
+    const container = $(`#${containerId}`);
+    if (!container) return;
+
+    const sorted = [...new Set(sections)].sort((a, b) => a - b);
+    const sig = sorted.join(',');
+    if (container.dataset.sig === sig) {
+        for (const btn of container.children) {
+            const s = Number(btn.dataset.section);
+            btn.classList.toggle('active', s === selectedId);
+            btn.setAttribute('aria-checked', s === selectedId ? 'true' : 'false');
+        }
+        return;
+    }
+
+    container.innerHTML = '';
+    container.dataset.sig = sig;
+    for (const s of sorted) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sidebar-item' + (s === selectedId ? ' active' : '');
+        btn.dataset.section = s;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', s === selectedId ? 'true' : 'false');
+        btn.setAttribute('aria-label', `Section ${s}`);
+        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">Section ${s}</span>`;
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
+        });
+        container.appendChild(btn);
+    }
 }
 
-export function renderDateLine() {
-    const d = new Date();
-    const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
-    const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    $('.date-line').innerHTML = `<strong>${weekday}</strong><span class="date-sep">·</span>${date}`;
-}
-
-// Idempotent: builds the weekday chips once, then only toggles active state.
-// The chip set comes from CONFIG.WEEKDAYS, so weekends never render.
 export function renderDayFilter(selectedDay) {
-    const container = $('.day-filter');
+    const container = $('#sidebar-days');
     if (!container) return;
     if (!container.children.length) {
         for (const day of WEEKDAYS) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'day-chip';
+            btn.className = 'sidebar-day-btn';
             btn.dataset.day = day;
-            btn.textContent = day.slice(0, 3);
-            btn.setAttribute('aria-pressed', 'false');
+            btn.textContent = day;
+            btn.setAttribute('role', 'radio');
+            btn.setAttribute('aria-checked', 'false');
             btn.setAttribute('aria-label', day);
-            if (day === todayName()) btn.classList.add('today');
             btn.addEventListener('click', () => {
                 window.dispatchEvent(new CustomEvent('daychange', { detail: { day } }));
             });
             container.appendChild(btn);
         }
-        enableArrowNav(container);
     }
     for (const btn of container.children) {
         const active = btn.dataset.day === selectedDay;
         btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        btn.setAttribute('aria-checked', active ? 'true' : 'false');
     }
-    // Snap the active chip into view on phones (no-op when the row doesn't
-    // scroll, e.g. the static desktop grid).
-    scrollChipIntoView(container, container.querySelector('.day-chip.active'), 'activeDay', selectedDay);
 }
 
-// Only scroll when the selection actually changed, so we never fight the user
-// scrolling the row by hand while the live clock re-renders.
-function scrollChipIntoView(container, chip, attr, value) {
-    if (!chip || container.dataset[attr] === String(value)) return;
-    container.dataset[attr] = String(value);
-    if (container.scrollWidth <= container.clientWidth + 1) return;
-    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    chip.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
+// ============================================================
+// Mobile drawer
+// ============================================================
+
+let drawerFocusTrapCleanup = null;
+
+export function openDrawer() {
+    const sidebar = $('#sidebar');
+    const overlay = $('#drawer-overlay');
+    if (!sidebar || !overlay) return;
+    sidebar.classList.add('open');
+    overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+    const focusable = sidebar.querySelectorAll('button:not([hidden]):not([disabled])');
+    if (focusable.length) focusable[0].focus();
+    drawerFocusTrapCleanup = trapFocus(sidebar, () => closeDrawer());
 }
 
-// Idempotent: rebuilds only when the set of available sections changes.
-export function renderSectionSelector(sections, selectedSection) {
-    const container = $('#section-selector');
-    if (!container) return;
-    const sorted = [...new Set(sections)].sort((a, b) => a - b);
-    const sig = sorted.join(',');
-    if (container.dataset.sig !== sig) {
-        container.innerHTML = '';
-        container.dataset.sig = sig;
-        for (const s of sorted) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'section-chip';
-            btn.dataset.section = s;
-            btn.textContent = s;
-            btn.setAttribute('aria-pressed', 'false');
-            btn.setAttribute('aria-label', `Section ${s}`);
-            btn.addEventListener('click', () => {
-                window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
-            });
-            container.appendChild(btn);
+export function closeDrawer() {
+    const sidebar = $('#sidebar');
+    const overlay = $('#drawer-overlay');
+    if (!sidebar || !overlay) return;
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+    if (drawerFocusTrapCleanup) { drawerFocusTrapCleanup(); drawerFocusTrapCleanup = null; }
+    const hamburger = $('#hamburger-btn');
+    if (hamburger) hamburger.focus();
+}
+
+export function isDrawerOpen() {
+    const sidebar = $('#sidebar');
+    return sidebar ? sidebar.classList.contains('open') : false;
+}
+
+function trapFocus(container, onEscape) {
+    function handler(e) {
+        if (e.key === 'Escape') { e.preventDefault(); onEscape(); return; }
+        if (e.key !== 'Tab') return;
+        const focusable = container.querySelectorAll('button:not([hidden]):not([disabled])');
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
         }
-        enableArrowNav(container);
     }
-    for (const btn of container.children) {
-        const active = Number(btn.dataset.section) === selectedSection;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    scrollChipIntoView(container, container.querySelector('.section-chip.active'), 'activeSection', selectedSection);
+    container.addEventListener('keydown', handler);
+    return () => container.removeEventListener('keydown', handler);
 }
 
-// Arrow / Home / End keyboard navigation for chip groups.
-function enableArrowNav(container) {
-    container.addEventListener('keydown', (e) => {
-        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-        const buttons = [...container.querySelectorAll('button')];
-        const idx = buttons.indexOf(document.activeElement);
-        if (idx === -1) return;
-        e.preventDefault();
-        let next;
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = buttons[(idx + 1) % buttons.length];
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = buttons[(idx - 1 + buttons.length) % buttons.length];
-        else if (e.key === 'Home') next = buttons[0];
-        else if (e.key === 'End') next = buttons[buttons.length - 1];
-        if (next) next.focus();
-    });
-}
+// ============================================================
+// Timeline rendering
+// ============================================================
 
-/**
- * The class to highlight in the timeline for a given day + time.
- * Priority: current class → next class today → first class on a future day.
- * Past days get no highlight (every card reads "done").
- */
 export function computeHighlight(classes, nowMin, day) {
     const dayClasses = classes.filter((c) => c.day === day).sort(byStart);
     if (day === todayName()) {
@@ -182,8 +226,6 @@ export function computeHighlight(classes, nowMin, day) {
     return { dayClasses, current: null, next };
 }
 
-// Live countdown / progress for the highlighted timeline card. Falls back to
-// nothing when there is no clock context (future days, search, day over).
 export function updateLiveClock(nowMin, current, next) {
     const featured = current || next;
     if (!featured) {
@@ -223,13 +265,9 @@ export function renderTimeline(nowMin, day, ctx, query = '') {
 
     const today = ctx.dayClasses;
     const q = query.trim().toLowerCase();
-
     const isToday = day === todayName();
     const dayStatus = isToday ? 'today' : (isBeforeToday(day) ? 'past' : 'future');
-    // Current wins today; a future day's first class stands in as the anchor.
-    const highlight = isToday
-        ? (ctx.current || ctx.next)
-        : (dayStatus === 'future' ? ctx.next : null);
+    const highlight = isToday ? (ctx.current || ctx.next) : (dayStatus === 'future' ? ctx.next : null);
 
     $('#timeline-title').textContent = isToday ? "Today's Schedule" : `${day}'s Schedule`;
     section.classList.remove('hidden');
@@ -280,24 +318,26 @@ export function renderTimeline(nowMin, day, ctx, query = '') {
 
 function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today', highlight = null) {
     let prevEnd = null;
+    let lunchShown = false;
     for (const c of items) {
         const startMin = toMinutes(c.startTime);
         const endMin = toMinutes(c.endTime);
-        const status = dayStatus === 'past'
-            ? 'completed'
-            : dayStatus === 'future'
-                ? 'upcoming'
-                : (endMin <= nowMin ? 'completed' : (startMin <= nowMin ? 'current' : 'upcoming'));
+        const status = dayStatus === 'past' ? 'completed'
+            : dayStatus === 'future' ? 'upcoming'
+            : (endMin <= nowMin ? 'completed' : (startMin <= nowMin ? 'current' : 'upcoming'));
         const hl = c === highlight;
 
         if (!skipBreaks && prevEnd !== null && startMin - prevEnd >= CONFIG.BREAK_THRESHOLD_MIN) {
-            const isLunch = startMin >= CONFIG.LUNCH_START && prevEnd <= CONFIG.LUNCH_END;
-            timeline.insertAdjacentHTML('beforeend', `
-                <li class="tl-break">
-                    <span class="tl-break-line"></span>
-                    <span class="tl-break-label">${isLunch ? `${ICONS.coffee}Lunch break` : 'Break'} · ${minutesToLabel(startMin - prevEnd)}</span>
-                    <span class="tl-break-line"></span>
-                </li>`);
+            const overlapsLunch = prevEnd < CONFIG.LUNCH_END && startMin > CONFIG.LUNCH_START;
+            if (overlapsLunch && !lunchShown) {
+                lunchShown = true;
+                timeline.insertAdjacentHTML('beforeend', `
+                    <li class="tl-break">
+                        <span class="tl-break-line"></span>
+                        <span class="tl-break-label">${ICONS.coffee}Lunch break · ${minutesToLabel(startMin - prevEnd)}</span>
+                        <span class="tl-break-line"></span>
+                    </li>`);
+            }
         }
 
         const badge = hl
@@ -333,8 +373,7 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
                     <span class="status-badge ${badge.cls}">${badge.label}</span>
                 </div>
                 ${c.roomChanged ? `<span class="room-change-badge">${ICONS.alertTriangle}<span>${c.originalRoom ? `Room changed · ${escapeHtml(c.originalRoom)} → ${escapeHtml(c.room)}` : 'Room changed'}</span></span>` : ''}
-                ${live}
-                ${progress}
+                ${live}${progress}
                 <div class="tl-time-row">
                     <span>${minutesToClock(startMin)} – ${minutesToClock(endMin)}</span>
                     <span class="tl-duration">${minutesToLabel(endMin - startMin)}</span>
@@ -345,56 +384,78 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
     }
 }
 
-// Shared empty/error card. renderEmpty resets it to the default state so a
-// previous error can never leave stale text behind.
-function hideAll() {
-    $('#schedule-section')?.classList.add('hidden');
-}
+// ============================================================
+// State cards
+// ============================================================
+
+function hideAll() { $('#schedule-section')?.classList.add('hidden'); }
 
 export function renderEmpty() {
-    hideLoading();
-    hideAll();
-    $('.state-card').classList.remove('hidden');
+    hideLoading(); hideAll();
+    $('.state-card')?.classList.remove('hidden');
     $('#empty-icon').innerHTML = ICONS.calendarX;
     $('#state-title').textContent = 'No classes found';
     $('#state-message').textContent = 'There are no classes scheduled for this day.';
-    $('.retry-btn').classList.add('hidden');
+    $('.retry-btn')?.classList.add('hidden');
 }
 
 export function renderError() {
-    hideLoading();
-    hideAll();
-    $('.state-card').classList.remove('hidden');
+    hideLoading(); hideAll();
+    $('.state-card')?.classList.remove('hidden');
     $('#empty-icon').innerHTML = ICONS.circleAlert;
     $('#state-title').textContent = "Couldn't load the timetable";
     $('#state-message').textContent = 'Check your connection and try again. Your last known schedule is still cached offline.';
-    $('.retry-btn').classList.remove('hidden');
+    $('.retry-btn')?.classList.remove('hidden');
 }
 
 export function renderSuccess() {
     hideLoading();
-    $('.state-card').classList.add('hidden');
-    $('.retry-btn').classList.add('hidden');
+    $('.state-card')?.classList.add('hidden');
+    $('.retry-btn')?.classList.add('hidden');
 }
 
+// ============================================================
+// Loading
+// ============================================================
+
+export function showLoading() {
+    const el = $('#loading-state');
+    if (!el) return;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.add('visible'), 150);
+}
+
+export function hideLoading() {
+    const el = $('#loading-state');
+    if (!el) return;
+    clearTimeout(el._timer);
+    el.classList.remove('visible');
+}
+
+export function renderDateLine() {}
+
 export function setLastUpdated(date) {
-    $('.last-updated').textContent = `Last updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+    const el = $('#last-updated');
+    if (el) el.textContent = `Updated ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export function showToast(message) {
     const toast = $('.toast');
+    if (!toast) return;
     toast.textContent = message;
     toast.classList.add('show');
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => {
-        toast.classList.remove('show');
-        toast.textContent = '';
-    }, 3000);
+    toast._timer = setTimeout(() => { toast.classList.remove('show'); toast.textContent = ''; }, 3000);
 }
 
 export function setRefreshSpinning(on) {
-    $('#refresh-btn').classList.toggle('spinning', on);
+    $('#refresh-btn')?.classList.toggle('spinning', on);
+    $('#refresh-btn-mobile')?.classList.toggle('spinning', on);
 }
+
+// ============================================================
+// Section modal
+// ============================================================
 
 export function showSectionModal(sections, onSelect) {
     const modal = $('#section-modal');
@@ -406,17 +467,13 @@ export function showSectionModal(sections, onSelect) {
         const btn = document.createElement('button');
         btn.className = 'section-option';
         btn.textContent = `Section ${s}`;
-        btn.addEventListener('click', () => {
-            hideSectionModal();
-            onSelect(s);
-        });
+        btn.addEventListener('click', () => { hideSectionModal(); onSelect(s); });
         options.appendChild(btn);
     }
     modal.classList.remove('hidden');
     requestAnimationFrame(() => {
         modal.classList.add('show');
-        const first = options.querySelector('button');
-        if (first) first.focus();
+        options.querySelector('button')?.focus();
     });
 }
 
