@@ -240,7 +240,6 @@ function initPullToRefresh() {
 
 function initActions() {
     const refresh = () => load({ silent: true });
-    $('#refresh-btn')?.addEventListener('click', refresh);
     $('#refresh-btn-mobile')?.addEventListener('click', refresh);
     $('.retry-btn')?.addEventListener('click', () => load());
 
@@ -330,8 +329,7 @@ function isStandalone() {
 }
 
 function showInstallButton() {
-    $('#install-btn')?.classList.remove('hidden');
-    $('#install-btn-mobile')?.classList.remove('hidden');
+    // Button is always visible now
 }
 
 function hideInstallButton() {

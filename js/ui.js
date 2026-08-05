@@ -449,7 +449,6 @@ export function showToast(message) {
 }
 
 export function setRefreshSpinning(on) {
-    $('#refresh-btn')?.classList.toggle('spinning', on);
     $('#refresh-btn-mobile')?.classList.toggle('spinning', on);
 }
 
