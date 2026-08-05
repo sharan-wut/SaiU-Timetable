@@ -244,21 +244,14 @@ function initActions() {
     $('#refresh-btn-mobile')?.addEventListener('click', refresh);
     $('.retry-btn')?.addEventListener('click', () => load());
 
-    const handleInstall = () => {
+    $('#install-btn')?.addEventListener('click', () => {
         if (window.deferredPrompt) {
             window.deferredPrompt.prompt();
-            window.deferredPrompt.userChoice.then((result) => {
-                if (result.outcome === 'accepted') {
-                    hideInstallButton();
-                }
-                window.deferredPrompt = null;
-            });
+            window.deferredPrompt.userChoice.then(() => { window.deferredPrompt = null; });
         } else {
             ui.showToast('Open the browser menu → "Install app"');
         }
-    };
-    $('#install-btn')?.addEventListener('click', handleInstall);
-    $('#install-btn-mobile')?.addEventListener('click', handleInstall);
+    });
 }
 
 // ============================================================
@@ -329,16 +322,6 @@ function isStandalone() {
         navigator.standalone === true;
 }
 
-function showInstallButton() {
-    $('#install-btn')?.classList.remove('hidden');
-    $('#install-btn-mobile')?.classList.remove('hidden');
-}
-
-function hideInstallButton() {
-    $('#install-btn')?.classList.add('hidden');
-    $('#install-btn-mobile')?.classList.add('hidden');
-}
-
 function initPWA() {
     if ('serviceWorker' in navigator) {
         const devHost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(location.hostname);
@@ -349,16 +332,8 @@ function initPWA() {
         }
     }
     if (isStandalone()) return;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        window.deferredPrompt = e;
-        showInstallButton();
-    });
-    window.addEventListener('appinstalled', () => {
-        window.deferredPrompt = null;
-        hideInstallButton();
-        trackEvent('pwa_installed');
-    });
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.deferredPrompt = e; });
+    window.addEventListener('appinstalled', () => { window.deferredPrompt = null; trackEvent('pwa_installed'); });
 }
 
 // ============================================================
