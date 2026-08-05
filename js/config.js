@@ -22,6 +22,6 @@ export const CONFIG = {
     SECTION_KEY: 'tt-section',
 
     BREAK_THRESHOLD_MIN: 40,
-    LUNCH_START: 12 * 60,
-    LUNCH_END: 15 * 60,
+    LUNCH_START: 12 * 60 + 15,  // 12:15 PM
+    LUNCH_END: 15 * 60,         // 3:00 PM
 };

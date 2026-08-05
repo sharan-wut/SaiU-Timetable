@@ -46,7 +46,14 @@ export function renderSidebar(state) {
         programSection.classList.toggle('hidden', !show);
     }
 
-    renderSidebarList('sidebar-years', state.years, state.yearId, 'yearId', 'yearchange', 'yearId');
+    const yearSection = $('#sidebar-years')?.closest('.sidebar-section');
+    if (yearSection) {
+        const singleYear = state.years && state.years.length <= 1;
+        yearSection.classList.toggle('hidden', singleYear);
+        if (!singleYear) {
+            renderSidebarList('sidebar-years', state.years, state.yearId, 'yearId', 'yearchange', 'yearId');
+        }
+    }
 
     const sectionWrapper = $('#sidebar-section-wrapper');
     if (sectionWrapper) {
@@ -134,7 +141,7 @@ export function renderDayFilter(selectedDay) {
             btn.type = 'button';
             btn.className = 'sidebar-day-btn';
             btn.dataset.day = day;
-            btn.textContent = day.slice(0, 3);
+            btn.textContent = day;
             btn.setAttribute('role', 'radio');
             btn.setAttribute('aria-checked', 'false');
             btn.setAttribute('aria-label', day);
@@ -311,6 +318,7 @@ export function renderTimeline(nowMin, day, ctx, query = '') {
 
 function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today', highlight = null) {
     let prevEnd = null;
+    let lunchShown = false;
     for (const c of items) {
         const startMin = toMinutes(c.startTime);
         const endMin = toMinutes(c.endTime);
@@ -320,13 +328,16 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
         const hl = c === highlight;
 
         if (!skipBreaks && prevEnd !== null && startMin - prevEnd >= CONFIG.BREAK_THRESHOLD_MIN) {
-            const isLunch = startMin >= CONFIG.LUNCH_START && prevEnd <= CONFIG.LUNCH_END;
-            timeline.insertAdjacentHTML('beforeend', `
-                <li class="tl-break">
-                    <span class="tl-break-line"></span>
-                    <span class="tl-break-label">${isLunch ? `${ICONS.coffee}Lunch break` : 'Break'} · ${minutesToLabel(startMin - prevEnd)}</span>
-                    <span class="tl-break-line"></span>
-                </li>`);
+            const overlapsLunch = prevEnd < CONFIG.LUNCH_END && startMin > CONFIG.LUNCH_START;
+            if (overlapsLunch && !lunchShown) {
+                lunchShown = true;
+                timeline.insertAdjacentHTML('beforeend', `
+                    <li class="tl-break">
+                        <span class="tl-break-line"></span>
+                        <span class="tl-break-label">${ICONS.coffee}Lunch break · ${minutesToLabel(startMin - prevEnd)}</span>
+                        <span class="tl-break-line"></span>
+                    </li>`);
+            }
         }
 
         const badge = hl

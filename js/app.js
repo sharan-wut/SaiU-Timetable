@@ -176,8 +176,7 @@ function render() {
     const now = nowMinutes();
     const sc = sectionClasses();
     const ctx = ui.computeHighlight(sc, now, day);
-    const searchInput = $('#sidebar-search-input');
-    ui.renderTimeline(now, day, ctx, searchInput?.value || '');
+    ui.renderTimeline(now, day, ctx, '');
 
     lastFeatureKey = (ctx.current || ctx.next)
         ? `${(ctx.current || ctx.next).subject}|${(ctx.current || ctx.next).startTime}|${ctx.current ? 1 : 0}`
@@ -233,42 +232,6 @@ function initPullToRefresh() {
         indicator.classList.remove('visible', 'active');
         pulling = false; pullStart = 0;
     }, { passive: true });
-}
-
-// ============================================================
-// Search
-// ============================================================
-
-function initSearch() {
-    const input = $('#sidebar-search-input');
-    const clear = $('#sidebar-search-clear');
-    if (!input) return;
-    let searchTimer = null;
-
-    const renderTimelineOnly = () => {
-        const day = selectedDay || contextDay();
-        const now = nowMinutes();
-        const ctx = ui.computeHighlight(sectionClasses(), now, day);
-        ui.renderTimeline(now, day, ctx, input.value);
-    };
-
-    input.addEventListener('input', () => {
-        clear?.classList.toggle('hidden', !input.value);
-        renderTimelineOnly();
-        clearTimeout(searchTimer);
-        const q = input.value.trim();
-        if (q) searchTimer = setTimeout(() => trackEvent('search_used', { search_term: q }), 600);
-    });
-    clear?.addEventListener('click', () => {
-        input.value = ''; clear.classList.add('hidden'); render();
-    });
-    window.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault(); input.focus(); input.select();
-        } else if (e.key === 'Escape' && document.activeElement === input) {
-            input.value = ''; clear?.classList.add('hidden'); input.blur(); renderTimelineOnly();
-        }
-    });
 }
 
 // ============================================================
@@ -402,7 +365,6 @@ function init() {
 
     initHamburger();
     initPullToRefresh();
-    initSearch();
     initActions();
     initNavigationListeners();
     initAutoRefresh();

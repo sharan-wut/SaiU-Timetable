@@ -12,7 +12,6 @@
 export const SCHOOLS = [
     {
         id: 'scds',
-        name: 'School of Computing and Data Science',
         shortName: 'SCDS',
         programs: null,
         years: [
@@ -29,7 +28,6 @@ export const SCHOOLS = [
     },
     {
         id: 'soai',
-        name: 'School of Artificial Intelligence',
         shortName: 'SOAI',
         programs: null,
         years: [
@@ -51,7 +49,6 @@ export const SCHOOLS = [
     },
     {
         id: 'sob',
-        name: 'School of Business',
         shortName: 'SOB',
         programs: [
             {
