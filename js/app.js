@@ -240,7 +240,6 @@ function initPullToRefresh() {
 
 function initActions() {
     const refresh = () => load({ silent: true });
-    $('#refresh-btn')?.addEventListener('click', refresh);
     $('#refresh-btn-mobile')?.addEventListener('click', refresh);
     $('.retry-btn')?.addEventListener('click', () => load());
 
@@ -320,6 +319,15 @@ function isStandalone() {
         window.matchMedia('(display-mode: minimal-ui)').matches ||
         window.matchMedia('(display-mode: window-controls-overlay)').matches ||
         navigator.standalone === true;
+}
+
+function showInstallButton() {
+    // Button is always visible now
+}
+
+function hideInstallButton() {
+    $('#install-btn')?.classList.add('hidden');
+    $('#install-btn-mobile')?.classList.add('hidden');
 }
 
 function initPWA() {
