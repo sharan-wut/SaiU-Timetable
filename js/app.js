@@ -27,6 +27,9 @@ function contextDay() {
 }
 
 function sectionClasses() {
+    const yearConfig = nav.getYear();
+    const hasSections = yearConfig && yearConfig.sections && yearConfig.sections.length > 1;
+    if (!hasSections) return classes;
     return selectedSection == null ? [] : classes.filter(c => c.section === selectedSection);
 }
 
