@@ -46,6 +46,7 @@ function renderNavigation() {
     const year = nav.getYear();
 
     ui.renderSidebar({
+        viewMode: nav.getViewMode(),
         schools: nav.availableSchools(),
         schoolId: school?.id || null,
         programs: nav.availablePrograms(),
