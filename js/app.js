@@ -220,6 +220,15 @@ function startCountdown() {
     countdownTimer = setInterval(() => {
         const now = nowMinutes();
         const day = selectedDay || contextDay();
+        const viewMode = nav.getViewMode();
+
+        if (viewMode === 'free-rooms') {
+            if (selectedRoomTime === 'now') {
+                render();
+            }
+            return;
+        }
+
         const sc = sectionClasses();
         const ctx = ui.computeHighlight(sc, now, day);
         const key = ctx.current || ctx.next

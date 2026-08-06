@@ -16,15 +16,17 @@ export function normalizeRoomName(roomRaw) {
  * Extract all unique valid room names from a set of class objects.
  */
 export function extractUniqueRooms(classes = []) {
-    const set = new Set();
+    const map = new Map();
     for (const c of classes) {
         const room = normalizeRoomName(c.room);
         if (room) {
-            set.add(room);
+            const lower = room.toLowerCase();
+            if (!map.has(lower)) {
+                map.set(lower, room);
+            }
         }
     }
-    // Sort room names naturally (e.g., Room 101, Room 102, Lab A)
-    return [...set].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    return [...map.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
 /**
