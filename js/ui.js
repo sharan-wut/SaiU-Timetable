@@ -37,6 +37,18 @@ function byStart(a, b) {
 // ============================================================
 
 export function renderSidebar(state) {
+    const viewMode = state.viewMode || 'timetable';
+    const ttBtn = $('#nav-btn-timetable');
+    const freeBtn = $('#nav-btn-freerooms');
+    if (ttBtn) {
+        ttBtn.classList.toggle('active', viewMode === 'timetable');
+        ttBtn.setAttribute('aria-checked', viewMode === 'timetable' ? 'true' : 'false');
+    }
+    if (freeBtn) {
+        freeBtn.classList.toggle('active', viewMode === 'free-rooms');
+        freeBtn.setAttribute('aria-checked', viewMode === 'free-rooms' ? 'true' : 'false');
+    }
+
     renderSidebarList('sidebar-schools', state.schools, state.schoolId, 'schoolId', 'schoolchange', 'schoolId');
     renderSidebarList('sidebar-programs', state.programs, state.programId, 'programId', 'programchange', 'programId');
 
@@ -482,3 +494,76 @@ export function hideSectionModal() {
     modal.classList.remove('show');
     modal.classList.add('hidden');
 }
+
+// ============================================================
+// Free Rooms View Rendering
+// ============================================================
+
+export function renderFreeRoomsView(data, dayName) {
+    const availableStat = $('#rooms-stat-available');
+    const occupiedStat = $('#rooms-stat-occupied');
+    if (availableStat) availableStat.textContent = `${data.availableCount} Available`;
+    if (occupiedStat) occupiedStat.textContent = `${data.occupiedCount} Occupied`;
+
+    const availGrid = $('#rooms-grid-available');
+    const occGrid = $('#rooms-grid-occupied');
+    const titleAvail = $('#title-available-rooms');
+    const titleOcc = $('#title-occupied-rooms');
+
+    if (!availGrid || !occGrid) return;
+
+    // Available Rooms
+    if (!data.available.length) {
+        availGrid.innerHTML = `<div class="tl-search-empty" style="grid-column: 1/-1; padding: 20px 0;">No vacant classrooms found for this selection.</div>`;
+    } else {
+        availGrid.innerHTML = data.available.map(room => {
+            const freeText = room.freeUntil
+                ? `Free until ${minutesToClock(toMinutes(room.freeUntil))}`
+                : `Free for the rest of the day`;
+            const nextText = room.nextClass
+                ? `<div class="room-detail-sub">Next class: <strong>${escapeHtml(room.nextClass.subject)}</strong> (${minutesToClock(toMinutes(room.nextClass.startTime))})</div>`
+                : `<div class="room-detail-sub">No further classes today</div>`;
+
+            return `
+                <div class="room-card available">
+                    <div class="room-card-header">
+                        <span class="room-name">${escapeHtml(room.roomName)}</span>
+                        <span class="room-badge badge-available">Available</span>
+                    </div>
+                    <div class="room-detail-main">
+                        ${ICONS.clock}
+                        <span>${freeText}</span>
+                    </div>
+                    ${nextText}
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Occupied Rooms
+    if (!data.occupied.length) {
+        occGrid.innerHTML = `<div class="tl-search-empty" style="grid-column: 1/-1; padding: 20px 0;">No occupied classrooms at this time.</div>`;
+    } else {
+        occGrid.innerHTML = data.occupied.map(room => {
+            const untilText = `Occupied until ${minutesToClock(toMinutes(room.occupiedUntil))}`;
+            const subj = room.currentClass ? escapeHtml(room.currentClass.subject) : 'Ongoing Class';
+            const faculty = room.currentClass && room.currentClass.faculty ? escapeHtml(room.currentClass.faculty) : '';
+
+            return `
+                <div class="room-card occupied">
+                    <div class="room-card-header">
+                        <span class="room-name">${escapeHtml(room.roomName)}</span>
+                        <span class="room-badge badge-occupied">Occupied</span>
+                    </div>
+                    <div class="room-detail-main">
+                        <span><strong>${subj}</strong></span>
+                    </div>
+                    <div class="room-detail-sub">
+                        ${untilText}${faculty ? ` • ${faculty}` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+

@@ -3,8 +3,9 @@ import { parseCSV } from './parser.js';
 import { getSection as getStoredSection, setSection as setStoredSection, hasSeenSectionModal, markSectionModalSeen } from './storage.js';
 import * as nav from './navigation.js';
 import * as ui from './ui.js';
-import { todayName, nowMinutes, nextSchoolDay, isSchoolDay } from './utils.js';
+import { todayName, nowMinutes, nextSchoolDay, isSchoolDay, toMinutes } from './utils.js';
 import { init as initAnalytics, trackEvent } from './analytics.js';
+import { getRoomAvailability } from './rooms.js';
 
 /**
  * App bootstrap, fetch, and interactivity.
@@ -17,6 +18,9 @@ let lastUpdated = null;
 let selectedDay = null;
 let countdownTimer = null;
 let lastFeatureKey = null;
+
+let selectedRoomTime = 'now';
+let roomSearchQuery = '';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -173,14 +177,35 @@ function render() {
     renderNavigation();
     const day = selectedDay || contextDay();
     ui.renderSuccess();
-    const now = nowMinutes();
-    const sc = sectionClasses();
-    const ctx = ui.computeHighlight(sc, now, day);
-    ui.renderTimeline(now, day, ctx, '');
+    const viewMode = nav.getViewMode();
 
-    lastFeatureKey = (ctx.current || ctx.next)
-        ? `${(ctx.current || ctx.next).subject}|${(ctx.current || ctx.next).startTime}|${ctx.current ? 1 : 0}`
-        : 'none';
+    const scheduleSection = $('#schedule-section');
+    const freeRoomsSection = $('#free-rooms-section');
+    const titleEl = $('#timeline-title');
+
+    if (viewMode === 'free-rooms') {
+        if (scheduleSection) scheduleSection.classList.add('hidden');
+        if (freeRoomsSection) freeRoomsSection.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = 'Free Classrooms Finder';
+
+        const now = nowMinutes();
+        const targetTimeMin = selectedRoomTime === 'now' ? now : toMinutes(selectedRoomTime);
+        const availability = getRoomAvailability(classes, day, targetTimeMin, roomSearchQuery);
+        ui.renderFreeRoomsView(availability, day);
+    } else {
+        if (freeRoomsSection) freeRoomsSection.classList.add('hidden');
+        if (scheduleSection) scheduleSection.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "Today's Schedule";
+
+        const now = nowMinutes();
+        const sc = sectionClasses();
+        const ctx = ui.computeHighlight(sc, now, day);
+        ui.renderTimeline(now, day, ctx, '');
+
+        lastFeatureKey = (ctx.current || ctx.next)
+            ? `${(ctx.current || ctx.next).subject}|${(ctx.current || ctx.next).startTime}|${ctx.current ? 1 : 0}`
+            : 'none';
+    }
 
     ui.setLastUpdated(lastUpdated || new Date());
 }
@@ -273,6 +298,30 @@ function initActions() {
     };
     $('#install-btn')?.addEventListener('click', handleInstall);
     $('#install-btn-mobile')?.addEventListener('click', handleInstall);
+
+    $('#nav-btn-timetable')?.addEventListener('click', () => {
+        nav.setViewMode('timetable');
+        ui.closeDrawer();
+    });
+    $('#nav-btn-freerooms')?.addEventListener('click', () => {
+        nav.setViewMode('free-rooms');
+        ui.closeDrawer();
+    });
+
+    const timePills = document.querySelectorAll('.time-pill');
+    timePills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            timePills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            selectedRoomTime = pill.dataset.time;
+            render();
+        });
+    });
+
+    $('#rooms-search-input')?.addEventListener('input', (e) => {
+        roomSearchQuery = e.target.value;
+        render();
+    });
 }
 
 // ============================================================
@@ -322,6 +371,9 @@ function initNavigationListeners() {
     window.addEventListener('daychange', (e) => {
         selectedDay = e.detail.day;
         trackEvent('weekday_changed', { weekday: e.detail.day });
+        render();
+    });
+    window.addEventListener('viewmodechange', () => {
         render();
     });
     window.addEventListener('navchange', () => renderNavigation());

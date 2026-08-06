@@ -5,7 +5,6 @@
  * navigation.js. The values here are used only as a fallback when no
  * navigation state is available (e.g. first paint before init completes).
  */
-/*fsdf*/
 export const CONFIG = {
     // Fallback sheet (used only when navigation state is not yet resolved).
     SHEET_ID: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
@@ -25,4 +24,4 @@ export const CONFIG = {
     BREAK_THRESHOLD_MIN: 40,
     LUNCH_START: 12 * 60 + 15,  // 12:15 PM
     LUNCH_END: 15 * 60,         // 3:00 PM
-};
+}

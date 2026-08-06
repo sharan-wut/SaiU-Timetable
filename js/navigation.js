@@ -15,6 +15,7 @@ let state = {
     year: null,
     section: null,
     yearConfig: null,
+    viewMode: 'timetable', // 'timetable' or 'free-rooms'
 };
 
 const yearMap = buildYearMap();
@@ -26,7 +27,15 @@ export function getProgram() { return state.program; }
 export function getYear() { return state.year; }
 export function getSection() { return state.section; }
 export function getYearConfig() { return state.yearConfig; }
+export function getViewMode() { return state.viewMode || 'timetable'; }
 export function getState() { return { ...state }; }
+
+export function setViewMode(mode) {
+    if (state.viewMode === mode) return;
+    state.viewMode = mode;
+    window.dispatchEvent(new CustomEvent('viewmodechange', { detail: { viewMode: mode } }));
+    window.dispatchEvent(new CustomEvent('navchange', { detail: { ...state } }));
+}
 
 // --- Helpers ---
 
