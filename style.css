@@ -166,9 +166,10 @@ input { font-family: inherit; }
 }
 .sidebar-item:hover { background: var(--surface-2); color: var(--text); }
 .sidebar-item.active {
-    background: rgba(201, 76, 76, 0.10);
-    color: #C94C4C;
+    background: rgba(224, 82, 82, 0.16);
+    color: var(--primary-hover);
     font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .sidebar-item-radio {
@@ -180,8 +181,8 @@ input { font-family: inherit; }
     transition: border-color var(--fast), background var(--fast);
 }
 .sidebar-item.active .sidebar-item-radio {
-    border-color: #C94C4C;
-    background: #C94C4C;
+    border-color: var(--primary);
+    background: var(--primary);
 }
 .sidebar-item.active .sidebar-item-radio::after {
     content: '';
@@ -189,7 +190,7 @@ input { font-family: inherit; }
     top: 3px; left: 3px;
     width: 5px; height: 5px;
     border-radius: 50%;
-    background: #111;
+    background: #0D0D0D;
 }
 
 .sidebar-item-label { flex: 1; min-width: 0; }
