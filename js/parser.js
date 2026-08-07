@@ -112,14 +112,26 @@ function splitCSVLine(line) {
 }
 
 export function findRoom(lines, rowIdx, colIdx) {
+    let emptyCount = 0;
     for (let k = rowIdx + 1; k < lines.length; k++) {
         if (!lines[k].trim()) continue;
         const row = splitCSVLine(lines[k]);
+
+        // Stop if we reach a new day section
+        if (row[0] && DAYS.includes(row[0].toUpperCase())) break;
+
         const cell = row[colIdx] || '';
         if (cell && !/LUNCH|OPEN BLOCK/i.test(cell) && !/\d\s*(AM|PM)/i.test(cell)) {
             return cell.replace(/\s+/g, ' ');
         }
-        break;
+
+        if (!cell) {
+            emptyCount++;
+            if (emptyCount > 5) break;
+        } else {
+            // Hit a non-room reserved keyword cell (e.g. LUNCH / OPEN BLOCK / time header)
+            break;
+        }
     }
     return '';
 }
