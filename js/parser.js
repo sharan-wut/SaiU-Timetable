@@ -9,7 +9,7 @@
  */
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-const SECTION_REGEX = /\(Sec\s*(\d+)\)/i;
+const SECTION_REGEX = /(?:\(|\b|[-–—])Sec\.?\s*(\d+)(?:\)|\b|[-–—])/i;
 
 /**
  * Parse a CSV string into an array of class objects.
@@ -140,9 +140,24 @@ export function parseTimeRange(text) {
     const normalized = text.replace(/(\d)\.(\d)/g, '$1:$2').replace(/(\d)(AM|PM)/gi, '$1 $2');
     const m = normalized.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
     if (!m) return null;
+    let startMeridiem = m[3];
+    const endMeridiem = m[6];
+    if (!startMeridiem && endMeridiem) {
+        const startH = parseInt(m[1], 10);
+        const endH = parseInt(m[4], 10);
+        if (endMeridiem.toUpperCase() === 'PM') {
+            if (startH < 8 || (startH <= endH && startH !== 12)) {
+                startMeridiem = 'PM';
+            } else {
+                startMeridiem = 'AM';
+            }
+        } else if (endMeridiem.toUpperCase() === 'AM') {
+            startMeridiem = 'AM';
+        }
+    }
     return {
-        start: to24Hour(m[1], m[2], m[3]),
-        end: to24Hour(m[4], m[5], m[6]),
+        start: to24Hour(m[1], m[2], startMeridiem),
+        end: to24Hour(m[4], m[5], endMeridiem),
     };
 }
 
@@ -155,13 +170,27 @@ function to24Hour(h, min, meridiem) {
 }
 
 export function splitSubjectFaculty(cell) {
-    const parts = cell.split(/\s{2,}/).map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^\(Sec\s*\d+\)$/i.test(p));
-    let subject = (parts[0] || '').replace(/\s*\(Sec\s*\d+\)/i, '').trim();
+    let clean = (cell || '').trim();
+    if (!clean) return { subject: '', faculty: '' };
+
+    // Check for explicit section token pattern inside cell: e.g. "Web Technology - Sec 4 - Rupam Sah" or "Web Technology (Sec 4) Rupam Sah"
+    const mSec = clean.match(/^(.*?)\s*(?:[-–—]\s*)?(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])\s*(?:[-–—]\s*)?(.*)$/i);
+    if (mSec && (mSec[1].trim() || mSec[2].trim())) {
+        const subject = mSec[1].replace(/[-–—\s]+$/, '').trim();
+        const faculty = mSec[2].replace(/^[-–—\s]+/, '').trim();
+        return { subject, faculty };
+    }
+
+    const parts = clean.split(/\s{2,}/).map(p => p.trim()).filter(Boolean)
+        .filter(p => !/^(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])$/i.test(p));
+    let subject = (parts[0] || '').replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
     let faculty = parts.slice(1).join(' ');
-    if (!faculty && /-\s*\S/.test(cell)) {
-        const m = cell.match(/-\s*(.+)$/);
-        if (m) faculty = m[1].trim();
+    if (!faculty && /[-–—]\s*\S/.test(clean)) {
+        const m = clean.match(/^(.*?)\s*[-–—]\s*(.+)$/);
+        if (m) {
+            subject = m[1].replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
+            faculty = m[2].trim();
+        }
     }
     return { subject, faculty };
 }

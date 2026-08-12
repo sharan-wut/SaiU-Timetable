@@ -117,11 +117,11 @@ async function load({ silent = false, background = false } = {}) {
         ui.showLoading();
     }
 
-    if (background) return;
+    if (!silent && !background) ui.setRefreshSpinning(true);
 
-    ui.setRefreshSpinning(!silent);
     try {
-        const res = await fetch(sheetUrl);
+        const fetchUrl = sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+        const res = await fetch(fetchUrl, { cache: 'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         const parsed = parseCSV(text, nav.getParserType(), nav.getTrackedCourses());
@@ -133,10 +133,11 @@ async function load({ silent = false, background = false } = {}) {
         syncSections();
         render();
         trackEvent('timetable_refreshed', { source: background ? 'background' : silent ? 'manual' : 'initial' });
-        if (!silent) ui.showToast('Timetable refreshed');
-    } catch {
+        if (!silent && !background) ui.showToast('Timetable refreshed');
+    } catch (err) {
+        console.warn('[TT] Timetable load failed:', err);
         if (!cached) ui.renderError();
-        if (!silent) ui.showToast('Offline — showing cached schedule');
+        if (!silent && !background) ui.showToast('Offline — showing cached schedule');
     } finally {
         ui.setRefreshSpinning(false);
     }

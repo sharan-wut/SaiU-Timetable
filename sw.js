@@ -89,7 +89,7 @@ self.addEventListener('fetch', (event) => {
 
   if (url.includes('docs.google.com/spreadsheets') && url.includes('export')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const cacheCopy = networkResponse.clone();
