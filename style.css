@@ -279,15 +279,6 @@ input { font-family: inherit; }
     opacity: 0.6;
 }
 
-.main-footer {
-    text-align: center;
-    padding: 27px 0;
-    font-size: 0.80rem;
-    color: var(--text-tertiary);
-    opacity: 0.5;
-    margin-top: auto;
-}
-
 /* ---------- Main content ---------- */
 .main-content {
     flex: 1;
