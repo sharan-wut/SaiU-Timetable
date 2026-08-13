@@ -129,14 +129,15 @@ function renderSidebarSectionList(containerId, sections, selectedId) {
     container.innerHTML = '';
     container.dataset.sig = sig;
     for (const s of sorted) {
+        const labelText = s === 8 ? 'Section 8 (Combined Lab)' : `Section ${s}`;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'sidebar-item' + (s === selectedId ? ' active' : '');
         btn.dataset.section = s;
         btn.setAttribute('role', 'radio');
         btn.setAttribute('aria-checked', s === selectedId ? 'true' : 'false');
-        btn.setAttribute('aria-label', `Section ${s}`);
-        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">Section ${s}</span>`;
+        btn.setAttribute('aria-label', labelText);
+        btn.innerHTML = `<span class="sidebar-item-radio"></span><span class="sidebar-item-label">${escapeHtml(labelText)}</span>`;
         btn.addEventListener('click', () => {
             window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: s } }));
         });
@@ -167,6 +168,74 @@ export function renderDayFilter(selectedDay) {
         const active = btn.dataset.day === selectedDay;
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+    renderTopDaySelector(selectedDay);
+}
+
+export function renderTopDaySelector(selectedDay) {
+    const container = $('#top-day-bar');
+    if (!container) return;
+
+    const currentToday = todayName();
+    if (!container.children.length) {
+        container.innerHTML = '';
+        for (const day of WEEKDAYS) {
+            const shortDay = day.slice(0, 3);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'top-day-tab';
+            btn.dataset.day = day;
+            const isToday = day === currentToday;
+            btn.innerHTML = `
+                <span class="top-day-name">${shortDay}</span>
+                ${isToday ? '<span class="top-day-dot" title="Today"></span>' : ''}
+            `;
+            btn.setAttribute('aria-label', `${day}${isToday ? ' (Today)' : ''}`);
+            btn.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('daychange', { detail: { day } }));
+            });
+            container.appendChild(btn);
+        }
+    }
+
+    for (const btn of container.children) {
+        const active = btn.dataset.day === selectedDay;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    }
+}
+
+export function renderElectivesList(availableElectives, selectedElectives = []) {
+    const wrapper = $('#sidebar-electives-wrapper');
+    const container = $('#sidebar-electives');
+    if (!container || !wrapper) return;
+
+    if (!availableElectives || !availableElectives.length) {
+        wrapper.classList.add('hidden');
+        return;
+    }
+
+    wrapper.classList.remove('hidden');
+    container.innerHTML = '';
+    const selectedSet = new Set(selectedElectives);
+
+    for (const subject of availableElectives) {
+        const isSelected = selectedSet.has(subject);
+        const label = document.createElement('label');
+        label.className = 'elective-chip' + (isSelected ? ' active' : '');
+        label.innerHTML = `
+            <input type="checkbox" class="elective-checkbox" ${isSelected ? 'checked' : ''} data-subject="${escapeHtml(subject)}">
+            <span class="elective-label">${escapeHtml(subject)}</span>
+        `;
+        const checkbox = label.querySelector('input');
+        checkbox.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            label.classList.toggle('active', checked);
+            window.dispatchEvent(new CustomEvent('electivechange', {
+                detail: { subject, selected: checked }
+            }));
+        });
+        container.appendChild(label);
     }
 }
 
@@ -371,12 +440,20 @@ function buildTimeline(timeline, items, nowMin, skipBreaks, dayStatus = 'today',
 
         const item = document.createElement('li');
         item.className = `tl-item ${status}${hl ? ' highlight' : ''}`;
+        const isLabClass = c.isLab || c.section === 8 || /lab/i.test(c.room || '');
+        const tagBadge = isLabClass
+            ? '<span class="type-tag tag-lab">Lab</span>'
+            : (c.isElective ? '<span class="type-tag tag-elective">Elective</span>' : '');
+
         item.innerHTML = `
             <div class="tl-marker"></div>
             <div class="tl-card">
                 <div class="tl-card-top">
                     <div>
-                        <div class="tl-subject">${escapeHtml(c.subject)}</div>
+                        <div class="tl-subject-row">
+                            <span class="tl-subject">${escapeHtml(c.subject)}</span>
+                            ${tagBadge}
+                        </div>
                         <div class="tl-meta">
                             ${c.faculty ? `<span class="tl-faculty">${escapeHtml(c.faculty)}</span>` : ''}
                             <span class="tl-room">${ICONS.mapPin}<span>${escapeHtml(c.room || 'Room TBA')}</span></span>
@@ -476,8 +553,8 @@ export function showSectionModal(sections, onSelect) {
     const sorted = [...new Set(sections)].sort((a, b) => a - b);
     for (const s of sorted) {
         const btn = document.createElement('button');
-        btn.className = 'section-option';
-        btn.textContent = `Section ${s}`;
+        btn.className = 'section-option' + (s === 8 ? ' section-option-lab' : '');
+        btn.textContent = s === 8 ? 'Section 8 (Combined Lab)' : `Section ${s}`;
         btn.addEventListener('click', () => { hideSectionModal(); onSelect(s); });
         options.appendChild(btn);
     }

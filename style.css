@@ -881,3 +881,134 @@ input { font-family: inherit; }
         padding: calc(var(--topbar-h) + 14px) 14px 48px;
     }
 }
+
+/* ============================================================
+   TOP DAY SELECTOR BAR (Mobile & Desktop)
+   ============================================================ */
+.top-day-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.top-day-bar::-webkit-scrollbar { display: none; }
+
+.top-day-tab {
+    flex: 1;
+    min-width: 54px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all var(--fast);
+    white-space: nowrap;
+}
+.top-day-tab:hover {
+    color: var(--text);
+    background: var(--surface-3);
+}
+.top-day-tab.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.top-day-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   TAG BADGES & FACULTY FULL DISPLAY
+   ============================================================ */
+.tl-subject-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.type-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.tag-lab {
+    background: rgba(147, 51, 234, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+}
+.tag-elective {
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+}
+.tl-faculty {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.35;
+}
+
+/* ============================================================
+   ELECTIVES LIST IN SIDEBAR
+   ============================================================ */
+.sidebar-electives-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.elective-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--fast);
+    user-select: none;
+}
+.elective-chip:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+.elective-chip.active {
+    background: rgba(14, 165, 233, 0.1);
+    border-color: rgba(14, 165, 233, 0.4);
+    color: var(--text);
+}
+.elective-checkbox {
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.section-option-lab {
+    border-color: rgba(147, 51, 234, 0.4);
+    background: rgba(147, 51, 234, 0.08);
+}

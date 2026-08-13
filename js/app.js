@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { parseCSV } from './parser.js';
-import { getSection as getStoredSection, setSection as setStoredSection, hasSeenSectionModal, markSectionModalSeen } from './storage.js';
+import { getSection as getStoredSection, setSection as setStoredSection, hasSeenSectionModal, markSectionModalSeen, getElectivesState, setElectivesState } from './storage.js';
 import * as nav from './navigation.js';
 import * as ui from './ui.js';
 import { todayName, nowMinutes, nextSchoolDay, isSchoolDay, toMinutes } from './utils.js';
@@ -14,6 +14,7 @@ import { getRoomAvailability } from './rooms.js';
 let classes = [];
 let sections = [];
 let selectedSection = null;
+let selectedElectives = getElectivesState();
 let lastUpdated = null;
 let selectedDay = null;
 let countdownTimer = null;
@@ -29,11 +30,29 @@ function contextDay() {
     return isSchoolDay(t) ? t : nextSchoolDay(t);
 }
 
+function getAvailableElectives() {
+    const set = new Set();
+    for (const c of classes) {
+        if (c.isElective || c.section == null) {
+            if (c.subject) set.add(c.subject);
+        }
+    }
+    return Array.from(set).sort();
+}
+
 function sectionClasses() {
     const yearConfig = nav.getYear();
     const hasSections = yearConfig && yearConfig.sections && yearConfig.sections.length > 1;
+    const selectedSet = new Set(selectedElectives);
+
     if (!hasSections) return classes;
-    return selectedSection == null ? [] : classes.filter(c => c.section === selectedSection);
+    if (selectedSection == null) return [];
+
+    return classes.filter(c => {
+        if (c.section === selectedSection) return true;
+        if (c.isElective && selectedSet.has(c.subject)) return true;
+        return false;
+    });
 }
 
 // ============================================================
@@ -56,6 +75,9 @@ function renderNavigation() {
         sections: nav.availableSections(),
         sectionId: selectedSection,
     });
+
+    const electives = getAvailableElectives();
+    ui.renderElectivesList(electives, selectedElectives);
 
     ui.renderDayFilter(selectedDay || contextDay());
 }
@@ -373,6 +395,17 @@ function initNavigationListeners() {
     window.addEventListener('daychange', (e) => {
         selectedDay = e.detail.day;
         trackEvent('weekday_changed', { weekday: e.detail.day });
+        render();
+    });
+    window.addEventListener('electivechange', (e) => {
+        const { subject, selected } = e.detail;
+        if (selected) {
+            if (!selectedElectives.includes(subject)) selectedElectives.push(subject);
+        } else {
+            selectedElectives = selectedElectives.filter(s => s !== subject);
+        }
+        setElectivesState(selectedElectives);
+        trackEvent('elective_toggled', { subject, selected });
         render();
     });
     window.addEventListener('viewmodechange', () => {

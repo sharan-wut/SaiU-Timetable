@@ -66,15 +66,23 @@ function parseGridCSV(text, trackedCourses = null) {
             const cell = row[j];
             if (!cell) continue;
 
+            // Skip obvious noise cells: single chars, bare numbers, stray punctuation
+            if (/^[\d\s()\-–—\/\\|]+$/.test(cell)) continue;
+            if (cell.length < 3) continue;
+            if (/^(LUNCH|BREAK|OPEN BLOCK|RECESS|CHAPEL)/i.test(cell.trim())) continue;
+
             const sectionMatch = cell.match(SECTION_REGEX);
+            const { subject, faculty } = splitSubjectFaculty(cell);
+            if (!subject || subject.length < 3) continue;
+            // Skip subject strings that are still stray punctuation/numbers after cleaning
+            if (/^[\d\s()\-–—\/\\|]+$/.test(subject)) continue;
+
+            const room = findRoom(lines, i, j);
+            const isLabColumn = j === 17 || /lab/i.test(room) || /lab/i.test(subject);
 
             if (sectionMatch) {
-                // Sectioned cell — always parse (existing behavior)
                 const section = parseInt(sectionMatch[1], 10);
                 if (!section) continue;
-
-                const room = findRoom(lines, i, j);
-                const { subject, faculty } = splitSubjectFaculty(cell);
 
                 data.push({
                     day: currentDay,
@@ -82,21 +90,32 @@ function parseGridCSV(text, trackedCourses = null) {
                     faculty,
                     room,
                     section,
+                    isLab: isLabColumn,
                     startTime: times.start,
                     endTime: times.end,
                 });
-            } else if (trackedSet) {
-                // Unsectioned cell — only parse when tracked courses are active
-                const { subject, faculty } = splitSubjectFaculty(cell);
+            } else if (isLabColumn) {
+                data.push({
+                    day: currentDay,
+                    subject,
+                    faculty,
+                    room: room || 'Computer Lab',
+                    section: 8,
+                    isLab: true,
+                    startTime: times.start,
+                    endTime: times.end,
+                });
+            } else {
                 const subjLower = subject.trim().toLowerCase();
-                if (subjLower && [...trackedSet].some(t => subjLower === t || subjLower.startsWith(t) || t.startsWith(subjLower))) {
-                    const room = findRoom(lines, i, j);
+                const isTracked = trackedSet ? [...trackedSet].some(t => subjLower === t || subjLower.startsWith(t) || t.startsWith(subjLower)) : true;
+                if (isTracked) {
                     data.push({
                         day: currentDay,
                         subject,
                         faculty,
                         room,
-                        section: 1,
+                        section: null,
+                        isElective: true,
                         startTime: times.start,
                         endTime: times.end,
                     });
@@ -173,25 +192,44 @@ export function splitSubjectFaculty(cell) {
     let clean = (cell || '').trim();
     if (!clean) return { subject: '', faculty: '' };
 
-    // Check for explicit section token pattern inside cell: e.g. "Web Technology - Sec 4 - Rupam Sah" or "Web Technology (Sec 4) Rupam Sah"
+    // Remove surrounding double-quotes if any
+    clean = clean.replace(/^"|"$/g, '').trim();
+
+    let subject = '';
+    let faculty = '';
+
     const mSec = clean.match(/^(.*?)\s*(?:[-–—]\s*)?(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])\s*(?:[-–—]\s*)?(.*)$/i);
     if (mSec && (mSec[1].trim() || mSec[2].trim())) {
-        const subject = mSec[1].replace(/[-–—\s]+$/, '').trim();
-        const faculty = mSec[2].replace(/^[-–—\s]+/, '').trim();
-        return { subject, faculty };
-    }
-
-    const parts = clean.split(/\s{2,}/).map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])$/i.test(p));
-    let subject = (parts[0] || '').replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
-    let faculty = parts.slice(1).join(' ');
-    if (!faculty && /[-–—]\s*\S/.test(clean)) {
-        const m = clean.match(/^(.*?)\s*[-–—]\s*(.+)$/);
-        if (m) {
-            subject = m[1].replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
-            faculty = m[2].trim();
+        subject = mSec[1].replace(/[-–—\s]+$/, '').trim();
+        faculty = mSec[2].replace(/^[-–—\s]+/, '').trim();
+    } else {
+        const parts = clean.split(/\s{2,}/).map(p => p.trim()).filter(Boolean)
+            .filter(p => !/^(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])$/i.test(p));
+        subject = (parts[0] || '').replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
+        faculty = parts.slice(1).join(' ');
+        if (!faculty && /[-–—]\s*\S/.test(clean)) {
+            const m = clean.match(/^(.*?)\s*[-–—]\s*(.+)$/);
+            if (m) {
+                subject = m[1].replace(/\s*(?:\(|\b|[-–—])Sec\.?\s*\d+(?:\)|\b|[-–—])/gi, '').trim();
+                faculty = m[2].trim();
+            }
         }
     }
+
+    // Clean up subject: remove trailing unclosed parentheses
+    subject = subject.replace(/\s*\([^)]*$/, '').trim();
+
+    if (faculty) {
+        faculty = faculty.replace(/^(?:[-–—\s]*Sem\s*\d+\s*[-–—\s]*)+/i, '').trim();
+        faculty = faculty.replace(/^\((.+)\)$/, '$1').trim();
+        // Strip stray leading/trailing parens/punctuation
+        faculty = faculty.replace(/^[()]+/, '').replace(/[()]+$/, '').trim();
+        faculty = faculty.replace(/^(Dr|Prof)\.([A-Z])/i, '$1. $2');
+        faculty = faculty.replace(/^[-–—\s]+/, '').trim();
+        // Ignore pure stray values
+        if (/^[\d\s()\-–—]+$/.test(faculty)) faculty = '';
+    }
+
     return { subject, faculty };
 }
 

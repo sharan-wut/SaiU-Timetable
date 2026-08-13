@@ -102,6 +102,11 @@
                 <div id="sidebar-sections" class="sidebar-list" role="radiogroup" aria-label="Select section"></div>
             </div>
 
+            <div id="sidebar-electives-wrapper" class="sidebar-section hidden">
+                <h3 class="sidebar-section-title">My Electives</h3>
+                <div id="sidebar-electives" class="sidebar-electives-list"></div>
+            </div>
+
             <div class="sidebar-divider"></div>
 
             <div class="sidebar-section">
@@ -125,6 +130,9 @@
     <!-- Main content -->
     <main id="app" class="main-content">
         <div class="content-container">
+            <!-- Top day bar for easy mobile & desktop day switching -->
+            <nav id="top-day-bar" class="top-day-bar" aria-label="Day selection"></nav>
+
             <div class="main-header">
                 <h2 id="timeline-title" class="main-title">Today's Schedule</h2>
                 <span id="timeline-stats" class="main-stats"></span>

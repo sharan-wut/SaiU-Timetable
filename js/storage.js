@@ -115,3 +115,20 @@ export function hasSeenSectionModal() {
 export function markSectionModalSeen() {
     localStorage.setItem('tt-section-modal-seen', '1');
 }
+
+// --- Electives selection persistence ---
+
+const ELECTIVES_KEY = 'tt-nav-electives';
+
+export function getElectivesState() {
+    try {
+        const raw = localStorage.getItem(ELECTIVES_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+export function setElectivesState(electivesList) {
+    try {
+        localStorage.setItem(ELECTIVES_KEY, JSON.stringify(electivesList));
+    } catch { /* full */ }
+}

@@ -18,7 +18,7 @@ export const SCHOOLS = [
             {
                 id: 'scds-2',
                 label: 'Year 2',
-                sections: [1, 2, 3, 4, 5, 6, 7],
+                sections: [1, 2, 3, 4, 5, 6, 7, 8],
                 sheetId: '1Jk3KCLqHHzi-jxigIcPpcXZestcxb8Y0BeQLjhiezb8',
                 gid: '0',
                 parser: 'grid',
